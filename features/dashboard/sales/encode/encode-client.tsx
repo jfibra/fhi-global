@@ -43,6 +43,7 @@ import {
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import { getDashboardRouteByRole } from "@/lib/auth"
 import { Field, SelectShell, inputCls, labelCls } from "./encode-ui"
+import { useMerchantOptions } from "../use-merchant-options"
 import { PartnerStep, type PartnerAgentInfo } from "./partner-step"
 import { PartnerA2ASection, type A2AMode } from "./partner-a2a-form"
 import {
@@ -66,6 +67,7 @@ function emptyForm(saleType: SaleType): SaleFormData {
     developer_id: "", project_id: "", project_unit_id: "",
     unit_number: "", block_number: "", lot_number: "",
     property_type: "", property_address: "",
+    merchant_id: "",
     client: { ...EMPTY_CLIENT },
     contract_price: "", reservation_date: "",
     payment_plan: "", payment_terms: "",
@@ -156,6 +158,8 @@ export function EncodeSaleClient({
   const [saleType, setSaleType] = useState<SaleType | null>(null)
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<SaleFormData>(emptyForm("project"))
+  // The accepted merchants, fetched once a rental is being recorded.
+  const merchantOptions = useMerchantOptions(form.sale_type === "rental")
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -673,6 +677,26 @@ export function EncodeSaleClient({
                     maxLength={300}
                   />
                 </Field>
+                {/* The Merchant Partnership Programme: a rental the tenant found by scanning a
+                    merchant's QR pays the merchant and the agent who signed it AED 100 each
+                    once the sale is validated. */}
+                {form.sale_type === "rental" && (
+                  <Field label="Came through a merchant QR">
+                    <SelectShell>
+                      <select
+                        className={`${inputCls} appearance-none cursor-pointer pr-10`}
+                        value={form.merchant_id}
+                        onChange={(e) => setField("merchant_id", e.target.value)}
+                      >
+                        <option value="">No — a direct rental</option>
+                        {merchantOptions.map((m) => (
+                          <option key={m.id} value={m.id}>{m.business_name}{m.code ? ` · ${m.code}` : ""}{m.status === "ended" ? " (agreement ended)" : ""}</option>
+                        ))}
+                      </select>
+                    </SelectShell>
+                    <p className="mt-1 text-xs text-[#6b7280]">Pick the merchant when the tenant scanned a merchant&apos;s QR on rentsouq.ae. They and their FHI agent are credited once the sale is validated.</p>
+                  </Field>
+                )}
               </>
             )}
 
@@ -807,6 +831,7 @@ export function EncodeSaleClient({
                   : [
                       ["Property type", form.property_type || "—"],
                       ["Property address", form.property_address || "—"],
+                      ...(form.sale_type === "rental" ? [["Merchant QR", merchantOptions.find((m) => m.id === form.merchant_id)?.business_name ?? "No — a direct rental"]] : []),
                     ]),
                 ["Unit / block / lot", [form.unit_number, form.block_number, form.lot_number].filter(Boolean).join(" · ") || "—"],
                 ["Client", `${form.client.first_name} ${form.client.last_name}`.trim() || "—"],

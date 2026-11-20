@@ -8,7 +8,9 @@ import {
 import { nationalityFlag } from "@/lib/nationalities"
 import { countryByIso, countryByName, countryFlag } from "@/lib/countries"
 import { PartnerLocationFields } from "@/components/auth/partner-location-fields"
+import { MerchantBusinessFields } from "@/components/auth/merchant-business-fields"
 import { checkPartnerSignupInfo, type PartnerSignupInfo } from "@/lib/partner-signup"
+import { checkMerchantSignupInfo, type MerchantSignupInfo } from "@/lib/merchant-signup"
 import GoogleAuthFlow from "@/components/auth/GoogleAuthFlow"
 import { OtpInput } from "@/components/auth/otp-input"
 import { sendRegisterOtp, verifyRegisterOtp } from "@/app/(public-page)/(auth)/register/actions"
@@ -99,12 +101,15 @@ export function RegisterUI({
   inviteRef = null,
   referrer = null,
 }: {
-  defaultAccountType?: "member" | "developer" | "global_partner"
+  defaultAccountType?: "member" | "developer" | "global_partner" | "merchant"
   inviteRef?: string | null
   referrer?: Referrer
 }) {
   const isPartner = defaultAccountType === "global_partner"
-  const [step, setStep]         = useState<"info" | "email" | "code">(isPartner ? "info" : "email")
+  // The Merchant Partnership Programme's sign-up (lib/merchant-signup.ts): the
+  // business first, then the email. Only through an agent's link.
+  const isMerchant = defaultAccountType === "merchant"
+  const [step, setStep]         = useState<"info" | "email" | "code">(isPartner || isMerchant ? "info" : "email")
   const [email, setEmail]       = useState("")
   const [code, setCode]         = useState("")
   const [challenge, setChallenge] = useState("")
@@ -122,7 +127,25 @@ export function RegisterUI({
   const [partnerInfo, setPartnerInfo] = useState<PartnerSignupInfo | null>(null)
   const waCountry = countryByIso(waIso)
 
+  // Merchant sign-up: the business, who signs for it, their WhatsApp.
+  const [businessName, setBusinessName] = useState("")
+  const [category, setCategory] = useState("")
+  const [contactName, setContactName] = useState("")
+  const [merchantWaIso, setMerchantWaIso] = useState("AE")
+  const [merchantInfo, setMerchantInfo] = useState<MerchantSignupInfo | null>(null)
+
   const continueFromInfo = () => {
+    if (isMerchant) {
+      const res = checkMerchantSignupInfo({ businessName, category, contactName, whatsappCode: countryByIso(merchantWaIso)?.dial ?? "", whatsappNumber: waNumber })
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setError("")
+      setMerchantInfo(res.info)
+      setStep("email")
+      return
+    }
     const res = checkPartnerSignupInfo({ country, whatsappCode: waCountry?.dial ?? "", whatsappNumber: waNumber })
     if (!res.ok) {
       setError(res.error)
@@ -143,7 +166,7 @@ export function RegisterUI({
     if (pending) return
     startTransition(async () => {
       setError("")
-      const res = await sendRegisterOtp(email, defaultAccountType, inviteRef ?? undefined, partnerInfo ?? undefined)
+      const res = await sendRegisterOtp(email, defaultAccountType, inviteRef ?? undefined, partnerInfo ?? undefined, merchantInfo ?? undefined)
       if (res?.error) {
         setError(res.error)
       } else {
@@ -159,7 +182,7 @@ export function RegisterUI({
     if (pending) return
     startTransition(async () => {
       setError("")
-      const res = await verifyRegisterOtp(email, code, challenge, defaultAccountType, inviteRef ?? undefined, partnerInfo ?? undefined)
+      const res = await verifyRegisterOtp(email, code, challenge, defaultAccountType, inviteRef ?? undefined, partnerInfo ?? undefined, merchantInfo ?? undefined)
       if (res?.error) setError(res.error)
       else if (res?.success) setSuccess(true)
     })
@@ -180,6 +203,20 @@ export function RegisterUI({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/FHI_Branding Set_PNG Copies-02.png" alt="FHI Global" className="h-16 w-auto object-contain" />
         </Link>
+
+        {/* The merchant invite: what the programme is, before the form. */}
+        {isMerchant && !success && (
+          <div className="mb-5 rounded-2xl bg-[#001f3f] px-6 py-5 text-white shadow-[0_10px_40px_-16px_rgba(0,31,63,0.45)]">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-['Outfit'] text-lg font-bold">rentsouq<span className="text-[#d6b357]">.ae</span></span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#d6b357]">Merchant programme</span>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-white/85">
+              Earn <span className="font-bold text-[#d6b357]">AED 100</span> every time a customer of yours rents a home through your own QR code, plus a voucher for them.
+              One-year agreement. Powered by FHI Global Property LLC and MCG Properties LLC.
+            </p>
+          </div>
+        )}
 
         {/* Card */}
         <div className="bg-white rounded-2xl border border-[#e8eaed] shadow-[0_10px_40px_-16px_rgba(0,31,63,0.22)] p-7 sm:p-8">
@@ -205,7 +242,7 @@ export function RegisterUI({
           ) : (
             <>
               <h1 className="font-['Outfit'] text-[26px] font-bold text-[#0d1117] leading-tight mb-4 text-left">
-                {step === "code" ? "Enter your code" : isPartner ? "Join as a Global Partner" : "Create your account"}
+                {step === "code" ? "Enter your code" : isPartner ? "Join as a Global Partner" : isMerchant ? "Register your business" : "Create your account"}
               </h1>
 
               {/* Info box */}
@@ -214,8 +251,14 @@ export function RegisterUI({
                 <p className="text-[13px] text-[#3a5a78] leading-relaxed">
                   {step === "code"
                     ? <>Enter the 6-digit code we sent to <span className="font-semibold">{email}</span>.</>
+                    : step === "info" && isMerchant
+                      ? referrer
+                        ? <><span className="font-semibold">{referrer.name}</span> from FHI is signing you up. First, tell us about your business and who signs for it.</>
+                        : <>This link is missing your FHI agent. Ask them to send you their merchant link again.</>
                     : step === "info"
                       ? <>{referrer ? <>You&apos;re joining <span className="font-semibold">{referrer.name}</span>&apos;s network as an FHI Global Partner. </> : null}First, tell us where you&apos;re based and your WhatsApp number.</>
+                    : isMerchant
+                      ? <>Enter the email you&apos;ll sign in with and we&apos;ll send you a 6-digit code. Next: your documents, then FHI reviews and issues your QR code.</>
                     : referrer && defaultAccountType === "global_partner"
                       ? <>You&apos;re joining <span className="font-semibold">{referrer.name}</span>&apos;s network as an FHI Global Partner — enter your email and we&apos;ll send you a code.</>
                     : referrer
@@ -224,7 +267,27 @@ export function RegisterUI({
                 </p>
               </div>
 
-              {step === "info" ? (
+              {step === "info" && isMerchant ? (
+                <form onSubmit={(e) => { e.preventDefault(); continueFromInfo() }} className="space-y-4" noValidate>
+                  <MerchantBusinessFields
+                    idPrefix="merchant"
+                    businessName={businessName}
+                    onBusinessName={(v) => { setBusinessName(v); setError("") }}
+                    category={category}
+                    onCategory={(v) => { setCategory(v); setError("") }}
+                    contactName={contactName}
+                    onContactName={(v) => { setContactName(v); setError("") }}
+                    waIso={merchantWaIso}
+                    onWaIso={(iso) => { setMerchantWaIso(iso); setError("") }}
+                    waNumber={waNumber}
+                    onWaNumber={(v) => { setWaNumber(v); setError("") }}
+                  />
+
+                  {error && <ErrorBox message={error} />}
+
+                  <SubmitButton pending={false} label={referrer ? "Continue" : "Continue anyway"} busy="" />
+                </form>
+              ) : step === "info" ? (
                 <form onSubmit={(e) => { e.preventDefault(); continueFromInfo() }} className="space-y-4" noValidate>
                   <PartnerLocationFields
                     idPrefix="partner"
@@ -253,6 +316,23 @@ export function RegisterUI({
                 </form>
               ) : step === "email" ? (
                 <form onSubmit={(e) => { e.preventDefault(); sendCode() }} className="space-y-4">
+                  {/* The merchant's business from the step before, with a way back to fix it. */}
+                  {isMerchant && merchantInfo && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e8eaed] bg-[#f9fafb] px-3.5 py-2.5 text-xs text-[#4b5563]">
+                      <span className="min-w-0">
+                        <span className="font-semibold text-[#111827]">{merchantInfo.businessName}</span>
+                        <span className="mx-1.5 text-[#d1d5db]">·</span>
+                        {merchantInfo.category}
+                        <span className="mx-1.5 text-[#d1d5db]">·</span>
+                        {merchantInfo.contactName}
+                        <span className="mx-1.5 text-[#d1d5db]">·</span>
+                        WhatsApp <span className="tabular-nums">{merchantInfo.whatsappCode} {merchantInfo.whatsappNumber}</span>
+                      </span>
+                      <button type="button" onClick={() => { setStep("info"); setError("") }} className="shrink-0 font-semibold text-[#001f3f] hover:underline">
+                        Edit
+                      </button>
+                    </div>
+                  )}
                   {/* A partner's answers from the step before, with a way back to fix them. */}
                   {isPartner && partnerInfo && (
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e8eaed] bg-[#f9fafb] px-3.5 py-2.5 text-xs text-[#4b5563]">
@@ -306,8 +386,8 @@ export function RegisterUI({
                   <GoogleAuthFlow
                     variant="register"
                     inviteRef={inviteRef}
-                    accountType={isPartner ? "global_partner" : null}
-                    signupInfo={isPartner ? partnerInfo : null}
+                    accountType={isPartner ? "global_partner" : isMerchant ? "merchant" : null}
+                    signupInfo={isPartner ? partnerInfo : isMerchant ? merchantInfo : null}
                   />
                 </>
               )}

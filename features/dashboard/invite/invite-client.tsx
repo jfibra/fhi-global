@@ -11,10 +11,11 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react"
 import {
   AlertTriangle, Cake, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet,
-  FileText, Loader2, MessageCircle, Phone, QrCode, RefreshCw, Search, Users, Globe,} from "lucide-react"
+  FileText, Loader2, MessageCircle, Phone, QrCode, RefreshCw, Search, Users, Globe, Store,} from "lucide-react"
 import { roleToLabel } from "@/lib/auth"
-import { ROLE_COLORS, invitableRolesFor, roleInList } from "@/lib/app-roles"
+import { ROLE_COLORS, canSignMerchants, invitableRolesFor, roleInList } from "@/lib/app-roles"
 import { partnerInviteShare, partnerInviteUrl, teamInviteShare, teamInviteUrl } from "@/lib/share-links"
+import { AgentMerchantsPanel } from "@/features/dashboard/merchants/agent-panel"
 
 type Recruit = {
   id: string
@@ -127,9 +128,12 @@ export function InviteClient({
   // Partners (agents abroad). Each has its own QR and its own recruit list.
   // ?view=partners (the Links page's Global Partners card) opens that list. The
   // page mounts only in the browser (DashboardAuthGate), so reading the URL here is safe.
-  const [view, setView] = useState<"team" | "partners">(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "partners" ? "partners" : "team",
-  )
+  // Merchants (the Merchant Partnership Programme, migration 092) is the third
+  // audience: businesses the agent signs, with their own panel.
+  const [view, setView] = useState<"team" | "partners" | "merchants">(() => {
+    const v = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("view") : null
+    return v === "partners" ? "partners" : v === "merchants" ? "merchants" : "team"
+  })
   const pool = useMemo(
     () => recruits.filter((r) => (view === "partners" ? r.role === "global_partner" : r.role !== "global_partner")),
     [recruits, view],
@@ -449,7 +453,9 @@ export function InviteClient({
             <p className="text-sm text-[#6b7280] mt-1">
               {view === "team"
                 ? "Share your QR so others can join your real estate team — they appear below as your recruits."
-                : "Share the Global Partners QR with agents outside the UAE — they register under your network as FHI Global Partners."}
+                : view === "merchants"
+                  ? "Sign businesses to the Merchant Partnership Programme — they show a QR for rentsouq.ae and you earn AED 100 for every rental through it."
+                  : "Share the Global Partners QR with agents outside the UAE — they register under your network as FHI Global Partners."}
             </p>
           </div>
           {/* Segmented toggle: which audience the QR and the list are for. */}
@@ -476,9 +482,24 @@ export function InviteClient({
               Global Partners
               <span className={`rounded-full px-1.5 text-[11px] ${view === "partners" ? "bg-[#d6b357] text-[#001f3f]" : "bg-[#f3f4f6]"}`}>{partnerCount}</span>
             </button>
+            {canSignMerchants(currentRole) && (
+              <button
+                type="button"
+                onClick={() => setView("merchants")}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
+                  view === "merchants" ? "bg-[#001f3f] text-white" : "text-[#374151] hover:bg-[#f3f4f6]"
+                }`}
+              >
+                <Store className="w-4 h-4" />
+                Merchants
+              </button>
+            )}
           </div>
         </div>
 
+        {view === "merchants" ? (
+          <AgentMerchantsPanel userId={userId} origin={origin} />
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
           <div className="space-y-4 self-start lg:sticky lg:top-0">
           {/* ── QR card: team invite ── */}
@@ -899,6 +920,7 @@ export function InviteClient({
             </div>
           </div>
         </div>
+        )}
       </div>
     </>
   )

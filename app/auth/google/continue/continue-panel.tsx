@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { PARTNER_SIGNUP_STORAGE_KEY } from "@/lib/partner-signup"
+import { MERCHANT_SIGNUP_STORAGE_KEY } from "@/lib/merchant-signup"
 
 /**
  * Post-OAuth landing: finish provisioning immediately and redirect. Every new
@@ -30,9 +31,13 @@ export default function GoogleContinuePanel({
     // The Global Partner step's answers, saved before leaving for Google — only
     // for this same invite.
     let partnerInfo: unknown = null
+    // The merchant's business, saved the same way for the merchant invite.
+    let merchantInfo: unknown = null
     try {
       const saved = JSON.parse(sessionStorage.getItem(PARTNER_SIGNUP_STORAGE_KEY) ?? "null") as { ref?: string | null } | null
       if (saved && (saved.ref ?? null) === (inviteRef ?? null)) partnerInfo = saved
+      const savedMerchant = JSON.parse(sessionStorage.getItem(MERCHANT_SIGNUP_STORAGE_KEY) ?? "null") as { ref?: string | null } | null
+      if (savedMerchant && (savedMerchant.ref ?? null) === (inviteRef ?? null)) merchantInfo = savedMerchant
     } catch {
       // nothing saved, or storage blocked
     }
@@ -40,7 +45,7 @@ export default function GoogleContinuePanel({
       const res = await fetch("/api/auth/google/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ next, ref: inviteRef, type: accountType, partnerInfo }),
+        body: JSON.stringify({ next, ref: inviteRef, type: accountType, partnerInfo, merchantInfo }),
       })
       const json = (await res.json()) as { redirect?: string; error?: string }
       if (!res.ok || !json.redirect) {
@@ -49,6 +54,7 @@ export default function GoogleContinuePanel({
       }
       try {
         sessionStorage.removeItem(PARTNER_SIGNUP_STORAGE_KEY)
+        sessionStorage.removeItem(MERCHANT_SIGNUP_STORAGE_KEY)
       } catch {
         // storage blocked
       }

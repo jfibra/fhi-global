@@ -1978,3 +1978,138 @@ export async function sendCalendarEntryEmail(input: CalendarEntryEmailInput): Pr
   const { subject, text } = calendarEntryEmailCopy(input)
   await deliver("CalendarEntryMailer", { from: fromAddress(), to: input.to, subject, text, html: calendarEntryEmailHtml(input) })
 }
+
+// ─── Merchant Partnership Programme (migration 092) ───────────────────────────
+
+export type MerchantAcceptedEmailInput = {
+  to: string
+  contactName: string | null
+  businessName: string
+  code: string
+  qrUrl: string
+  landingUrl: string
+  agreementStartsOn: string
+  agreementEndsOn: string
+  agentName: string | null
+  dashboardUrl: string
+  /** The QR as PNG and the A5 flyer as PDF, attached. */
+  qrPng: Buffer
+  flyerPdf: Buffer
+  note?: string | null
+}
+
+/** The merchant is accepted: here is your code, your QR, your flyer. */
+export async function sendMerchantAcceptedEmail(input: MerchantAcceptedEmailInput): Promise<void> {
+  const name = greetingName(input.contactName)
+  const subject = `Welcome aboard, ${input.businessName} — your rentsouq.ae QR code is ready`
+  const detailsHtml = [
+    detailRow("Merchant code", input.code),
+    detailRow("Agreement", `${input.agreementStartsOn} to ${input.agreementEndsOn}`),
+    detailRow("Your reward", "AED 100 for every unit your customers rent, paid on the 15th of the next month"),
+    input.agentName ? detailRow("Your FHI agent", input.agentName) : "",
+  ].join("")
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Merchant Partnership Programme</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">You're in, ${esc(name)}</h1>
+            <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">
+              FHI has accepted <strong>${esc(input.businessName)}</strong> into the programme. Your QR code and A5 flyer are attached:
+              put the flyer by your till, let your staff hand it out, and post the QR on your own pages twice a month.
+              Every customer who scans it and rents on rentsouq.ae is credited to you.
+            </p>
+            ${input.note ? `<p style="margin:14px 0 0;padding:12px 14px;border-radius:10px;background:#faf7ee;font-size:14px;line-height:1.6;color:#4b5563;">${esc(input.note)}</p>` : ""}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafd;border:1px solid #e2e8f2;border-radius:14px;">
+              <tr><td style="padding:16px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${detailsHtml}</table>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 40px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#6b7280;">
+            Your QR opens <a href="${esc(input.qrUrl)}" style="color:${NAVY};font-weight:700;">${esc(input.qrUrl)}</a>, which counts the scan and takes your customer to rentsouq.ae under your code.
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:22px 40px 34px;">
+            <a href="${esc(input.dashboardUrl)}"
+               style="display:inline-block;background:${NAVY};color:#ffffff;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:13px 34px;border-radius:12px;border-bottom:3px solid ${GOLD};">
+              Open your merchant dashboard
+            </a>
+          </td>
+        </tr>`
+  await deliver("MerchantAcceptedMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `FHI has accepted ${input.businessName} into the Merchant Partnership Programme.\n\nMerchant code: ${input.code}\nAgreement: ${input.agreementStartsOn} to ${input.agreementEndsOn}\nYour reward: AED 100 for every unit your customers rent, paid on the 15th of the next month.\n${input.agentName ? `Your FHI agent: ${input.agentName}\n` : ""}\nYour QR opens ${input.qrUrl} and forwards to ${input.landingUrl}. The QR (PNG) and your A5 flyer (PDF) are attached.\n\nYour dashboard: ${input.dashboardUrl}`,
+    html: eventEmailShell({ subject, preheader: `Your merchant code is ${input.code}. The QR and flyer are attached.`, bodyHtml }),
+    attachments: [
+      { filename: `qr-${input.code}.png`, content: input.qrPng, contentType: "image/png" },
+      { filename: `flyer-${input.code}.pdf`, content: input.flyerPdf, contentType: "application/pdf" },
+    ],
+  })
+}
+
+/** The signing agent is told their merchant was accepted. */
+export async function sendMerchantAgentAcceptedEmail(input: { to: string; agentName: string | null; businessName: string; code: string; dashboardUrl: string }): Promise<void> {
+  const name = greetingName(input.agentName)
+  const subject = `${input.businessName} is now your active merchant`
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Merchant accepted</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">Nice work, ${esc(name)}</h1>
+            <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">
+              FHI accepted <strong>${esc(input.businessName)}</strong>, the merchant you signed. Their code is <strong>${esc(input.code)}</strong>
+              and their QR and flyer have gone to them by email. Help them put the flyer up this week and follow up each month:
+              every validated rental through their QR earns you AED 100, paid on the 10th of the next month.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:22px 40px 34px;">
+            <a href="${esc(input.dashboardUrl)}"
+               style="display:inline-block;background:${NAVY};color:#ffffff;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:13px 34px;border-radius:12px;border-bottom:3px solid ${GOLD};">
+              See my merchants
+            </a>
+          </td>
+        </tr>`
+  await deliver("MerchantAgentAcceptedMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `FHI accepted ${input.businessName}, the merchant you signed. Code: ${input.code}. Every validated rental through their QR earns you AED 100, paid on the 10th of the next month.\n\nMy merchants: ${input.dashboardUrl}`,
+    html: eventEmailShell({ subject, preheader: `Code ${input.code}. Their QR and flyer have gone to them.`, bodyHtml }),
+  })
+}
+
+/** The merchant (and the agent, in copy) is told the application was declined, and why. */
+export async function sendMerchantDeclinedEmail(input: { to: string | string[]; contactName: string | null; businessName: string; reason: string; agentName: string | null }): Promise<void> {
+  const name = greetingName(input.contactName)
+  const subject = `About ${input.businessName}'s merchant application`
+  const bodyHtml = `
+        <tr>
+          <td style="padding:36px 40px 6px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${GOLD};">Merchant Partnership Programme</p>
+            <h1 style="margin:0 0 12px;font-size:23px;line-height:1.3;font-weight:700;color:#0d1117;">Thank you, ${esc(name)}</h1>
+            <p style="margin:0;font-size:15px;line-height:1.65;color:#4b5563;">
+              We reviewed <strong>${esc(input.businessName)}</strong>'s application and can't take it into the programme at this time.
+            </p>
+            <p style="margin:14px 0 0;padding:12px 14px;border-radius:10px;background:#f8fafd;border:1px solid #e2e8f2;font-size:14px;line-height:1.6;color:#4b5563;"><strong>Reason:</strong> ${esc(input.reason)}</p>
+            <p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#6b7280;">${input.agentName ? `${esc(input.agentName)} from FHI can tell you what would change this.` : "Reply to this email if you have a question."}</p>
+          </td>
+        </tr>`
+  await deliver("MerchantDeclinedMailer", {
+    from: fromAddress(),
+    to: input.to,
+    subject,
+    text: `We reviewed ${input.businessName}'s application to the Merchant Partnership Programme and can't take it at this time.\n\nReason: ${input.reason}\n${input.agentName ? `\n${input.agentName} from FHI can tell you what would change this.` : ""}`,
+    html: eventEmailShell({ subject, preheader: "We reviewed the application.", bodyHtml }),
+  })
+}

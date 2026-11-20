@@ -443,6 +443,10 @@ const nextConfig = {
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {
+        source: "/merchant/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
         source: "/api/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },

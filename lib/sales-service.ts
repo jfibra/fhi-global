@@ -162,6 +162,7 @@ export function normalizeSale(row: unknown): SaleRecord {
     lot_number: typeof raw.lot_number === "string" ? raw.lot_number : null,
     property_type: typeof raw.property_type === "string" ? raw.property_type : null,
     property_address: typeof raw.property_address === "string" ? raw.property_address : null,
+    merchant_id: typeof raw.merchant_id === "string" ? raw.merchant_id : null,
     client_id: String(raw.client_id ?? ""),
     contract_price: Number(raw.contract_price ?? 0),
     reservation_date: typeof raw.reservation_date === "string" ? raw.reservation_date : null,
@@ -837,6 +838,8 @@ export async function createSale(
     lot_number: form.lot_number.trim() || null,
     property_type: !isProjectSale ? form.property_type.trim() || null : null,
     property_address: !isProjectSale ? form.property_address.trim() || null : null,
+    // A rental that came through a merchant's QR (the Merchant Partnership Programme).
+    merchant_id: form.sale_type === "rental" && form.merchant_id ? form.merchant_id : null,
     client_id: clientData.id,
     contract_price: Number(form.contract_price),
     reservation_date: form.reservation_date || null,

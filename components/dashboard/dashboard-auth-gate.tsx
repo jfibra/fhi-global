@@ -12,7 +12,7 @@ import { AssistantTeaserPopup } from "@/components/dashboard/assistant-teaser-po
 import { partnerInfoMetadata } from "@/lib/partner-signup"
 import { PageLoader } from "@/components/ui/PageLoader"
 import { getDashboardRouteByRole, getProfileByUserId, isInactiveProfile, isUploadedProfilePhoto, type AppProfile, type AppUser } from "@/lib/auth"
-import { ROLES_AGENT_ASSISTANT, isAdminStaffRole, isKnownAppRoleId, roleInList } from "@/lib/app-roles"
+import { ROLES_AGENT_ASSISTANT, isAdminStaffRole, isKnownAppRoleId, isMerchantRole, roleInList } from "@/lib/app-roles"
 import { readViewAsCookie } from "@/lib/view-as"
 
 /**
@@ -78,7 +78,7 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   // BRN not answered yet → their own profile page (any role's /…/profile shows
   // their own profile), with a flag so it scrolls to the BRN field.
   useEffect(() => {
-    if (!session || isProfilePath(pathname)) return
+    if (!session || isProfilePath(pathname) || isMerchantRole(session.profile.role)) return
     if (!isUploadedProfilePhoto(session.profile.profile_url) || !needsBrnAnswer(session.profile.metadata)) return
     router.replace(`${getDashboardRouteByRole(session.profile.role)}/profile?${BRN_REQUIRED_PARAM}=required`)
   }, [session, pathname, router])
@@ -99,7 +99,9 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   // photo it's a letter avatar ("MS") that can't be told apart by its link, and
   // the directory / business cards need a real headshot. A Google picture
   // already on the profile stays there for display until they upload.
-  const needsPhoto = !isUploadedProfilePhoto(session.profile.profile_url)
+  // A merchant is a business, not an agent: no headshot, no BRN (migration 092).
+  const isMerchant = isMerchantRole(session.profile.role)
+  const needsPhoto = !isMerchant && !isUploadedProfilePhoto(session.profile.profile_url)
 
   const meta = (session.profile.metadata ?? {}) as Record<string, unknown>
 
@@ -107,7 +109,7 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   // Dubai Land Department register has, or ticks "I'm not a broker", every
   // dashboard page sends them to their profile page, where the BRN field is
   // highlighted. After the photo — the photo pop-up shows over any page.
-  const needsBrn = !needsPhoto && needsBrnAnswer(meta)
+  const needsBrn = !isMerchant && !needsPhoto && needsBrnAnswer(meta)
   const afterSetup = !needsPhoto && !needsBrn
   // Hold the page while the redirect above runs.
   if (needsBrn && !isProfilePath(pathname)) return <PageLoader />

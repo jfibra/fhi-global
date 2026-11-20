@@ -56,6 +56,7 @@ import { isAdminStaffRole } from "@/lib/app-roles"
 import { DeveloperCombobox } from "@/components/developers/developer-combobox"
 import { ChoiceCard, PartnerSharesEditor, type PartnerAgentInfo } from "./encode/partner-step"
 import { toTitleCase } from "./sale-ui"
+import { useMerchantOptions } from "./use-merchant-options"
 
 // ─── Portal ───────────────────────────────────────────────────────────────────
 
@@ -117,6 +118,7 @@ const EMPTY_FORM: SaleFormData = {
   developer_id: "", project_id: "", project_unit_id: "",
   unit_number: "", block_number: "", lot_number: "",
   property_type: "", property_address: "",
+  merchant_id: "",
   client: EMPTY_CLIENT,
   contract_price: "", reservation_date: "",
   payment_plan: "", payment_terms: "",
@@ -182,6 +184,8 @@ export function SaleFormDialog({
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
   const [saving, setSaving] = useState(false)
   const [developers, setDevelopers] = useState<DeveloperOption[]>([])
+  // The accepted merchants, only fetched once a rental is being recorded.
+  const merchantOptions = useMerchantOptions(form.sale_type === "rental")
   const [projects, setProjects] = useState<ProjectOption[]>([])
   const [units, setUnits] = useState<ProjectUnitOption[]>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
@@ -263,6 +267,7 @@ export function SaleFormDialog({
         lot_number:        editSale.lot_number ?? "",
         property_type:     editSale.property_type ?? "",
         property_address:  editSale.property_address ?? "",
+        merchant_id:       editSale.merchant_id ?? "",
         client: {
           first_name:     client?.first_name ?? "",
           middle_name:    client?.middle_name ?? "",
@@ -697,6 +702,27 @@ export function SaleFormDialog({
                   />
                   {errors.unit_information && <p className="text-xs text-rose-500 mt-1 ml-1">{errors.unit_information}</p>}
                 </div>
+
+                {/* The Merchant Partnership Programme: a rental the tenant found by
+                    scanning a merchant's QR pays that merchant and the agent who
+                    signed it AED 100 each once the sale is validated. */}
+                {form.sale_type === "rental" && (
+                  <div className="md:col-span-2">
+                    <FieldLabel text="Came through a merchant QR" />
+                    <select
+                      value={form.merchant_id}
+                      onChange={(e) => set("merchant_id", e.target.value)}
+                      disabled={disabled}
+                      className={sel("merchant_id")}
+                    >
+                      <option value="">No — a direct rental</option>
+                      {merchantOptions.map((m) => (
+                        <option key={m.id} value={m.id}>{m.business_name}{m.code ? ` · ${m.code}` : ""}{m.status === "ended" ? " (agreement ended)" : ""}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-[#6b7280] mt-1 ml-1">Pick the merchant when the tenant scanned a merchant&apos;s QR on rentsouq.ae. They and their FHI agent are credited once the sale is validated.</p>
+                  </div>
+                )}
                 </>
                 )}
 

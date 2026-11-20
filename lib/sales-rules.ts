@@ -129,6 +129,8 @@ export type SaleRecord = {
   lot_number: string | null
   property_type: string | null
   property_address: string | null
+  /** A rental that came through a merchant's QR (migration 092). */
+  merchant_id: string | null
   client_id: string
   contract_price: number
   reservation_date: string | null
@@ -245,6 +247,8 @@ export type SaleFormData = {
   // property (brokerage / rental)
   property_type: string
   property_address: string
+  /** Rental only: the merchant whose QR the tenant came through (migration 092), or "". */
+  merchant_id: string
   // client
   client: ClientFormData
   // contract
@@ -427,6 +431,8 @@ export function saleDetailsPayload(form: SaleFormData) {
     lot_number: form.lot_number.trim() || null,
     property_type: !isProjectSale ? form.property_type.trim() || null : null,
     property_address: !isProjectSale ? form.property_address.trim() || null : null,
+    // A merchant's QR only brings rentals (the Merchant Partnership Programme).
+    merchant_id: form.sale_type === "rental" && form.merchant_id ? form.merchant_id : null,
     contract_price: Number(form.contract_price),
     reservation_date: form.reservation_date || null,
     payment_plan: form.payment_plan.trim() || null,

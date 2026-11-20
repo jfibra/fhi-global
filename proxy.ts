@@ -220,5 +220,6 @@ export const config = {
     "/secretary/:path*",
     "/teamsecretary/:path*",
     "/member/:path*",
+    "/merchant/:path*",
   ],
 }

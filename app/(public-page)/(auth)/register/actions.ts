@@ -12,6 +12,8 @@ import { DEFAULT_ACCOUNT_PASSWORD } from "@/lib/account-password"
 import { emailTypoMessage } from "@/lib/email-typo"
 import { checkEmailDeliverable } from "@/lib/email-validate"
 import { checkPartnerSignupInfo, partnerInfoMetadata, type PartnerSignupInfo } from "@/lib/partner-signup"
+import { checkMerchantSignupInfo, merchantInfoMetadata, type MerchantSignupInfo } from "@/lib/merchant-signup"
+import { createMerchantRecord, merchantAccountName } from "@/lib/merchant/signup-server"
 import { joinInvitersTeam } from "@/lib/recruit-team"
 
 /**
@@ -22,12 +24,15 @@ export type RegisterOtpResult = { error?: string; ok?: boolean; success?: boolea
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-type AccountType = "member" | "developer" | "global_partner"
+type AccountType = "member" | "developer" | "global_partner" | "merchant"
 
 function normalizeAccountType(v: string | null | undefined): AccountType {
   const t = String(v ?? "").toLowerCase().trim().replace(/-/g, "_")
-  return t === "developer" ? "developer" : t === "global_partner" ? "global_partner" : "member"
+  return t === "developer" ? "developer" : t === "global_partner" ? "global_partner" : t === "merchant" ? "merchant" : "member"
 }
+
+/** A merchant registers only through an agent's link: the business is recorded in that agent's name. */
+const MERCHANT_NEEDS_AGENT = "This merchant link is missing your FHI agent. Ask them to send you their merchant link again."
 
 /**
  * Step 1 — create the account (email pre-confirmed; access is gated by the
@@ -48,6 +53,8 @@ export async function sendRegisterOtp(
   refRaw?: string,
   /** Global Partner "Where are you based?" answers — required on that path. */
   partnerInfoRaw?: PartnerSignupInfo,
+  /** The merchant's business (lib/merchant-signup.ts) — required on that path. */
+  merchantInfoRaw?: MerchantSignupInfo,
 ): Promise<RegisterOtpResult> {
   if (!hasServerSupabaseEnv()) {
     return { error: "Supabase environment variables are not configured." }
@@ -70,6 +77,11 @@ export async function sendRegisterOtp(
   if (accountType === "global_partner") {
     const partner = checkPartnerSignupInfo(partnerInfoRaw)
     if (!partner.ok) return { error: partner.error }
+  }
+  if (accountType === "merchant") {
+    if (!UUID_RE.test(ref)) return { error: MERCHANT_NEEDS_AGENT }
+    const merchant = checkMerchantSignupInfo(merchantInfoRaw)
+    if (!merchant.ok) return { error: merchant.error }
   }
 
   const admin = createAdminSupabase()
@@ -133,6 +145,8 @@ export async function verifyRegisterOtp(
   refRaw?: string,
   /** Global Partner "Where are you based?" answers — saved on the profile. */
   partnerInfoRaw?: PartnerSignupInfo,
+  /** The merchant's business — becomes the merchant record. */
+  merchantInfoRaw?: MerchantSignupInfo,
 ): Promise<RegisterOtpResult> {
   if (!hasServerSupabaseEnv()) {
     return { error: "Supabase environment variables are not configured." }
@@ -149,7 +163,14 @@ export async function verifyRegisterOtp(
   // Global partners register only through an agent's invite link; without a
   // valid ref they fall back to member like everyone else.
   const ref = String(refRaw ?? "").trim()
-  const role = accountType === "developer" ? "developer" : accountType === "global_partner" && UUID_RE.test(ref) ? "global_partner" : "member"
+  const role =
+    accountType === "developer"
+      ? "developer"
+      : accountType === "global_partner" && UUID_RE.test(ref)
+        ? "global_partner"
+        : accountType === "merchant" && UUID_RE.test(ref)
+          ? "merchant"
+          : "member"
   // Where a partner lives + their WhatsApp (lib/partner-signup.ts), checked
   // again here before the code is used up.
   let partnerInfo: PartnerSignupInfo | null = null
@@ -157,6 +178,14 @@ export async function verifyRegisterOtp(
     const partner = checkPartnerSignupInfo(partnerInfoRaw)
     if (!partner.ok) return { error: partner.error }
     partnerInfo = partner.info
+  }
+  // The merchant's business (lib/merchant-signup.ts), checked again too.
+  let merchantInfo: MerchantSignupInfo | null = null
+  if (accountType === "merchant") {
+    if (!UUID_RE.test(ref)) return { error: MERCHANT_NEEDS_AGENT }
+    const merchant = checkMerchantSignupInfo(merchantInfoRaw)
+    if (!merchant.ok) return { error: merchant.error }
+    merchantInfo = merchant.info
   }
 
   const check = await checkOtpChallenge(challenge, code)
@@ -214,16 +243,26 @@ export async function verifyRegisterOtp(
     }
   }
 
+  // A merchant needs a real inviter: the business is recorded in that agent's name.
+  const isMerchant = role === "merchant"
+  if (isMerchant && !invitedBy) {
+    await supabase.auth.signOut()
+    return { error: MERCHANT_NEEDS_AGENT }
+  }
+
   // Least privilege: every self-registration lands as-is — member (or
   // developer on that path) with status pending until an admin approves.
+  // A merchant's login is active at once: it must upload its documents before
+  // FHI can review it; what the admins gate is the merchant record (092).
   const finalRole = role
-  const finalStatus = "pending"
+  const finalStatus = isMerchant ? "active" : "pending"
 
   const mergedMetadata = {
     ...(current?.metadata ?? {}),
     ...(invitedBy ? { invited_by: invitedBy } : {}),
     ...(invitedByName ? { invited_by_name: invitedByName } : {}),
     ...(partnerInfo ? partnerInfoMetadata(partnerInfo) : {}),
+    ...(merchantInfo ? merchantInfoMetadata(merchantInfo) : {}),
   }
 
   const { error: profileError } = await admin
@@ -234,12 +273,22 @@ export async function verifyRegisterOtp(
         role: finalRole,
         status: finalStatus,
         metadata: mergedMetadata,
+        ...(merchantInfo ? merchantAccountName(merchantInfo) : {}),
       },
       { onConflict: "id" },
     )
   if (profileError) {
     await supabase.auth.signOut()
     return { error: `Profile setup failed: ${profileError.message}` }
+  }
+
+  if (merchantInfo) {
+    try {
+      await createMerchantRecord(admin, { profileId: userId, agentId: invitedBy, info: merchantInfo })
+    } catch (e) {
+      await supabase.auth.signOut()
+      return { error: `Could not set up the merchant record: ${e instanceof Error ? e.message : "unknown error"}` }
+    }
   }
 
   // A recruit joins their recruiter's team (lib/recruit-team.ts) — the same
@@ -249,7 +298,8 @@ export async function verifyRegisterOtp(
   // when they hold no active membership yet, so re-running the code step can
   // never pull someone back from a team an admin moved them to. Best effort:
   // joinInvitersTeam never throws.
-  if (invitedBy) {
+  // A merchant is a client business, never a team member.
+  if (invitedBy && !isMerchant) {
     const { data: held } = await admin
       .from("team_memberships")
       .select("id")
@@ -268,9 +318,13 @@ export async function verifyRegisterOtp(
     subjectType: "profiles",
     subjectId: userId,
     subjectLabel: data.user.email ?? email,
-    description: `Self-registered as ${finalRole} via email OTP (${finalStatus})`,
+    description: `Self-registered as ${finalRole} via email OTP (${finalStatus})${merchantInfo ? ` — merchant ${merchantInfo.businessName}` : ""}`,
     ...ctx,
   })
+
+  // A merchant goes straight to its dashboard: the documents checklist is its
+  // first screen (no agent-style profile to complete).
+  if (isMerchant) redirect("/merchant")
 
   // New accounts are pending — keep the session so they can finish their
   // profile now; afterwards they're held on /account-inactive for approval.

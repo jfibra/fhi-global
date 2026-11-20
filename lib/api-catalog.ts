@@ -176,6 +176,28 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     notes: ["A team's sales include its subteams at any depth, counted once per team, like the Teams page and the top-teams board."],
   },
   {
+    key: "merchants",
+    name: "Merchants",
+    path: "/api/external/merchants",
+    summary: "The Merchant Partnership Programme: every merchant with its code, agreement, agent, QR scans and closed deals.",
+    returns:
+      "Each merchant: business name and kind, address, status, the one-year agreement's dates, the agent who signed it, the signatory's contact, the customer voucher, the QR address and where it forwards, whether the four documents are in, scans this month and in all, validated deals this month and in all, and the incentives due (AED 100 per deal to the merchant and to the agent). With include=deals, the period figures, the statement and the newest rentals. Bank details are never returned.",
+    params: [
+      { name: "status", meaning: "accepted (default), submitted, onboarding, declined, ended or all." },
+      { name: "agent", meaning: "A profile id; the merchants that agent signed." },
+      { name: "code", meaning: "One merchant by its code, like M-4K7Q." },
+      { name: "id, q", meaning: "One merchant by id, or words to match in the name or code." },
+      { name: "include", meaning: "deals — adds the figures and the newest rentals (50 merchants at most)." },
+      { name: "page, limit", meaning: "Paging. limit up to 100, default 50. Newest first." },
+    ],
+    examples: [
+      { label: "Active merchants with their deals", query: "status=accepted&include=deals" },
+      { label: "One merchant by code", query: "code=M-4K7Q&include=deals" },
+      { label: "Everything, every status", query: "status=all&limit=100" },
+    ],
+    notes: ["merchants[].contact.account_id is the merchant's FHI login, the id the users endpoint gives rentsouq.ae for auto-login.", "The QR opens fhiglobal.ae/m/<code>, which counts the scan and forwards to rentsouq.ae with ?ref=<code>."],
+  },
+  {
     key: "events",
     name: "Events",
     path: "/api/external/events",

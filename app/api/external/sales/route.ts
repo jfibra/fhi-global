@@ -25,9 +25,14 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 const COLUMNS =
-  "id, agent_id, developer_id, project_id, project_unit_id, unit_number, block_number, lot_number, client_id, contract_price, reservation_date, payment_plan, payment_terms, price_per_sqft, total_area_sqft, commission_status, validation_status, remarks, partners, created_at, updated_at, leader_confirmed_at"
+  "id, agent_id, developer_id, project_id, project_unit_id, unit_number, block_number, lot_number, client_id, contract_price, reservation_date, payment_plan, payment_terms, price_per_sqft, total_area_sqft, commission_status, validation_status, remarks, partners, created_at, updated_at, leader_confirmed_at, sale_type, property_type, property_address, merchant_id"
 
 type Row = SaleRow & {
+  sale_type: string | null
+  property_type: string | null
+  property_address: string | null
+  /** A rental that came through a merchant's QR (the Merchant Partnership Programme). */
+  merchant_id: string | null
   project_unit_id: string | null
   unit_number: string | null
   block_number: string | null
@@ -88,10 +93,24 @@ export async function GET(req: NextRequest) {
   if (developerId && !UUID_RE.test(developerId)) return NextResponse.json({ error: "developer must be an id." }, { status: 400 })
   const since = (q.get("since") ?? "").trim()
   if (since && Number.isNaN(Date.parse(since))) return NextResponse.json({ error: "since must be an ISO timestamp." }, { status: 400 })
+  // The merchant filter: an id or a code (M-4K7Q) — the rentals that came through its QR.
+  let merchantId: string | null = null
+  const merchantParam = (q.get("merchant") ?? "").trim()
+  if (merchantParam) {
+    if (UUID_RE.test(merchantParam)) merchantId = merchantParam
+    else {
+      const { data } = await admin.from("merchants").select("id").eq("code", merchantParam.toUpperCase()).maybeSingle()
+      merchantId = (data?.id as string | undefined) ?? "00000000-0000-0000-0000-000000000000"
+    }
+  }
+  const saleType = (q.get("type") ?? "").trim().toLowerCase()
+  if (saleType && !["project", "brokerage", "rental"].includes(saleType)) return NextResponse.json({ error: "type must be project, brokerage or rental." }, { status: 400 })
 
   const build = (select: string, opts?: { count?: "exact"; head?: boolean }) => {
     let s = admin.from("sales_reports").select(select, opts)
     if (status !== "all") s = s.eq("validation_status", status)
+    if (merchantId) s = s.eq("merchant_id", merchantId)
+    if (saleType) s = s.eq("sale_type", saleType)
     // Business date = reservation_date, else the day it was recorded.
     if (from) s = s.or(`reservation_date.gte.${from},and(reservation_date.is.null,created_at.gte.${from}T00:00:00+04:00)`)
     if (to) s = s.or(`reservation_date.lte.${to},and(reservation_date.is.null,created_at.lt.${shiftDay(to, 1)}T00:00:00+04:00)`)
@@ -115,12 +134,15 @@ export async function GET(req: NextRequest) {
   const devIds = [...new Set(rows.map((s) => s.developer_id).filter(Boolean))]
   const projIds = [...new Set(rows.map((s) => s.project_id).filter((x) => x !== null))]
   const clientIds = [...new Set(rows.map((s) => s.client_id).filter((x): x is string => !!x))]
-  const [agents, devs, projs, clients] = await Promise.all([
+  const merchantIds = [...new Set(rows.map((s) => s.merchant_id).filter((x): x is string => !!x))]
+  const [agents, devs, projs, clients, merchants] = await Promise.all([
     agentIds.length ? admin.from("profiles").select("id, fullname").in("id", agentIds) : Promise.resolve({ data: [] as { id: string; fullname: string | null }[] }),
     devIds.length ? admin.from("developers").select("id, name").in("id", devIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     projIds.length ? admin.from("projects").select("id, name, slug").in("id", projIds) : Promise.resolve({ data: [] as { id: number; name: string; slug: string }[] }),
     clientIds.length ? admin.from("clients").select("id, first_name, last_name").in("id", clientIds) : Promise.resolve({ data: [] as { id: string; first_name: string | null; last_name: string | null }[] }),
+    merchantIds.length ? admin.from("merchants").select("id, business_name, code").in("id", merchantIds) : Promise.resolve({ data: [] as { id: string; business_name: string; code: string | null }[] }),
   ])
+  const merchantById = new Map((merchants.data ?? []).map((m) => [m.id, m]))
   const agentName = new Map((agents.data ?? []).map((a) => [a.id, (a.fullname ?? "Unknown agent").trim().replace(/\s+/g, " ")]))
   const devName = new Map((devs.data ?? []).map((d) => [d.id, d.name]))
   const proj = new Map((projs.data ?? []).map((p) => [Number(p.id), p]))
@@ -139,8 +161,14 @@ export async function GET(req: NextRequest) {
       commission_status: s.commission_status ?? "pending",
       leader_confirmed_at: s.leader_confirmed_at,
       currency: "AED",
+      /** project (default), brokerage or rental. */
+      sale_type: s.sale_type ?? "project",
       contract_price: num(s.contract_price),
       unit: { number: s.unit_number, block: s.block_number, lot: s.lot_number, area_sqft: num(s.total_area_sqft), price_per_sqft: num(s.price_per_sqft), project_unit_id: s.project_unit_id },
+      /** Brokerage and rental deals describe the property instead of a project. */
+      property: s.sale_type && s.sale_type !== "project" ? { type: s.property_type, address: s.property_address } : null,
+      /** A rental that came through a merchant's QR (the Merchant Partnership Programme), else null. */
+      merchant: s.merchant_id ? { id: s.merchant_id, name: merchantById.get(s.merchant_id)?.business_name ?? null, code: merchantById.get(s.merchant_id)?.code ?? null } : null,
       payment: { plan: s.payment_plan, terms: s.payment_terms },
       developer: s.developer_id ? { id: s.developer_id, name: devName.get(s.developer_id) ?? null } : null,
       project: p ? { id: p.id, name: p.name, slug: p.slug } : s.project_id !== null ? { id: s.project_id, name: null, slug: null } : null,
@@ -157,7 +185,7 @@ export async function GET(req: NextRequest) {
       success: true,
       data,
       summary: { count: pageRes.count ?? data.length, value: Math.round(value), currency: "AED" },
-      meta: { total: pageRes.count ?? data.length, page, limit, filters: { from: from || null, to: to || null, status, agent: agentId, developer: developerId || null, project: projectId, since: since || null } },
+      meta: { total: pageRes.count ?? data.length, page, limit, filters: { from: from || null, to: to || null, status, agent: agentId, developer: developerId || null, project: projectId, merchant: merchantId, type: saleType || null, since: since || null } },
     },
     { headers: { "cache-control": "no-store" } },
   )

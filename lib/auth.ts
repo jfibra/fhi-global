@@ -18,6 +18,8 @@ import {
   ROLES_PHOTO_LOGO,
   ROLES_DLD_OPEN_DATA,
   ROLES_AGENT_ASSISTANT,
+  ROLES_DOCUMENT_LIBRARY,
+  isMerchantRole,
 } from "@/lib/app-roles"
 
 export type AppUser = {
@@ -105,6 +107,12 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   links: ["agent", "team_leader"],
   // Logos on a photo, in the browser — not for developers or members.
   "photo-logo": [...ROLES_PHOTO_LOGO],
+  // The merchant dashboard (features/dashboard/merchant, migration 092): the
+  // merchant's own QR, closed deals, documents and business profile.
+  qr: ["merchant"],
+  deals: ["merchant"],
+  documents: ["merchant", ...ROLES_DOCUMENT_LIBRARY],
+  business: ["merchant"],
 }
 
 export function getDashboardRouteByRole(role?: string | null) {
@@ -284,7 +292,10 @@ export function isPathExemptFromProfileCompletionGate(pathname: string, role?: s
   const r = normalizeAppRole(role)
   const base = getDashboardRouteByRole(r)
   if (pathname === `${base}/profile` || pathname.startsWith(`${base}/profile/`)) return true
-  if (isDeveloperRole(r)) {
+  // Developers and merchants are external business accounts: their sign-up
+  // already holds what the dashboard needs, and birthday / nationality / a
+  // headshot are an agent's fields, not a company's.
+  if (isDeveloperRole(r) || isMerchantRole(r)) {
     return pathname === base || pathname.startsWith(`${base}/`)
   }
   return false

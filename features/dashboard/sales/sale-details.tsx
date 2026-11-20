@@ -16,6 +16,7 @@ import {
 import type { SaleRecord, CommissionStatus, ValidationStatus } from "@/lib/sales-service"
 import { toTitleCase } from "./sale-ui"
 import { SalePartnersPanel } from "./sale-partners-panel"
+import { useMerchantLabel } from "./use-merchant-options"
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -105,6 +106,8 @@ export function SaleDetails({
   const clientName = sale.clients
     ? `${sale.clients.first_name} ${sale.clients.last_name}`
     : "—"
+  // The merchant whose QR a rental came through (the Merchant Partnership Programme).
+  const merchantLabel = useMerchantLabel(sale.merchant_id)
 
   return (
     <Portal>
@@ -177,6 +180,7 @@ export function SaleDetails({
                 <>
                   <DetailRow label="Property Type" value={sale.property_type} />
                   <DetailRow label="Property Address" value={sale.property_address} />
+                  {sale.sale_type === "rental" && sale.merchant_id && <DetailRow label="Merchant QR" value={merchantLabel ?? "Loading…"} />}
                 </>
               )}
               <DetailRow label="Unit Number" value={sale.unit_number} />

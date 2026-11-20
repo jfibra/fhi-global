@@ -5,7 +5,7 @@ import {
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays, CalendarRange,
   Wallet, MessagesSquare, FileText, UploadCloud, Stamp, Globe, FolderDown, Library, MonitorPlay,
-  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch, Link as LinkIcon, Webhook,
+  Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch, Link as LinkIcon, Webhook, Store,
 } from "lucide-react"
 import { API_PAGE_OWNERS } from "@/lib/api-catalog"
 import {
@@ -184,6 +184,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: GitBranch, label: "Genealogy", to: "genealogy", description: "Any recruiter's whole tree, level by level." },
       // Any recruiter's My Team page as they see it (KPIs, top sellers, every deal).
       { icon: TrendingUp, label: "Team Performance", to: "team-performance", description: "Any recruiter's My Team page — KPIs, top sellers, every deal." },
+      // The Merchant Partnership Programme (migration 092): the review queue, every merchant, their QR scans and closed deals.
+      { icon: Store, label: "Merchants", to: "merchants", description: "Merchants signed by the agents — review, accept and issue their QR codes." },
     ],
   },
   { icon: Network, label: "Teams", to: "teams" },
@@ -406,6 +408,20 @@ const MEMBER_NAV: RoleNavEntry[] = [
   SUPPORT_TICKETS,
 ]
 
+/**
+ * A merchant in the Merchant Partnership Programme (migration 092): its own
+ * QR and materials, the rentals that came through it, the four official
+ * documents and the business profile. Nothing of the agents' toolkit.
+ */
+const MERCHANT_NAV: RoleNavEntry[] = [
+  OVERVIEW,
+  { icon: QrCode, label: "My QR & materials", to: "qr" },
+  { icon: TrendingUp, label: "Closed deals", to: "deals" },
+  { icon: Files, label: "Documents", to: "documents" },
+  { icon: Briefcase, label: "Business profile", to: "business" },
+  SUPPORT_TICKETS,
+]
+
 /** One list per role. Exhaustive by construction — see the note at the top. */
 const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   super_admin:    ADMIN_NAV,
@@ -421,6 +437,7 @@ const ROLE_NAV: Record<AppRoleId, RoleNavEntry[]> = {
   // Agents abroad: the agent sidebar, verbatim (the leaderboard is an overview
   // component, not a nav item — see GlobalPartnerOverview).
   global_partner: salesPipelineNav({ projects: true, invite: false }),
+  merchant:       MERCHANT_NAV,
 }
 
 // ─── Resolution ───────────────────────────────────────────────────────────────

@@ -27,6 +27,8 @@ The company's recorded sales. Amounts are AED.
 | `developer` | A developer id. |
 | `project` | A project id or slug. |
 | `since` | An ISO timestamp; only rows changed since then (`updated_at`), for incremental syncs. |
+| `merchant` | A merchant id or code (`M-4K7Q`): the rentals that came through that merchant's QR (the Merchant Partnership Programme). |
+| `type` | `project`, `brokerage` or `rental`. |
 | `page`, `limit` | Paging; `limit` ≤ 100, default 50. Newest first. |
 
 ```
@@ -68,6 +70,8 @@ curl -H "Authorization: Bearer $KEY" \
 ```
 
 `summary` covers the whole filter, not just the page. `credits` is who the sale counts for and how much: a solo sale is its agent at 100%; a shared deal lists every partner with their share. The client is named only; no contact details leave the system through this endpoint.
+
+Since 2026-11-20 each sale also carries `sale_type` (`project`, `brokerage` or `rental`), `property` (`{ type, address }` for brokerage and rental deals, else null) and `merchant` (`{ id, name, code }` when a rental came through a merchant's QR, else null).
 
 ## GET /api/external/sales/top
 
@@ -354,6 +358,48 @@ curl -H "Authorization: Bearer $KEY" "https://fhiglobal.ae/api/external/develope
   "meta": { "total": 1, "page": 1, "limit": 50, "filters": { "q": "emaar" } }
 }
 ```
+
+## GET /api/external/merchants
+
+The Merchant Partnership Programme (`guides/merchants.md`): businesses signed by the agents that show a QR for rentsouq.ae and earn AED 100 per rented unit; the agent who signed them earns AED 100 too. rentsouq.ae shows each merchant its dashboard from this. **Bank details are never returned.**
+
+| Parameter | Meaning |
+|---|---|
+| `status` | `accepted` (default), `submitted` (all four documents in, waiting for FHI), `onboarding`, `declined`, `ended` or `all`. |
+| `agent` | A profile id; the merchants that agent signed. |
+| `code` | One merchant by its code, like `M-4K7Q`. |
+| `id`, `q` | One merchant by id, or words to match in the name or code. |
+| `include` | `deals` — adds the period figures, the statement and the newest rentals (50 merchants at most per page). |
+| `page`, `limit` | Paging; `limit` ≤ 100, default 50. Newest first. |
+
+```
+GET /api/external/merchants?status=accepted&include=deals
+GET /api/external/merchants?code=M-4K7Q&include=deals
+```
+
+Each row:
+
+```json
+{
+  "id": "…", "code": "M-4K7Q", "business_name": "Bayt Al Noor Restaurant", "category": "Restaurant",
+  "address": "Shop 4, Al Barsha Mall, Al Barsha 1", "emirate": "Dubai", "website": null, "status": "accepted",
+  "agreement": { "starts_on": "2026-11-20", "ends_on": "2027-11-19", "active": true },
+  "agent": { "id": "…", "name": "Michelle Guinto", "email": "…", "phone": "+971…" },
+  "contact": { "name": "Khalid Al Mansoori", "title": "Owner", "email": "…", "whatsapp": "+971…", "account_id": "<the merchant's FHI login id>" },
+  "voucher": "15% off any meal for two",
+  "qr": { "url": "https://fhiglobal.ae/m/M-4K7Q", "landing": "https://rentsouq.ae/?ref=M-4K7Q" },
+  "documents": { "complete": true },
+  "scans": { "this_month": 212, "total": 1140 },
+  "deals": { "validated_this_month": 5, "validated_total": 5 },
+  "incentives": { "merchant_per_deal": 100, "agent_per_deal": 100, "merchant_this_month": 500, "agent_this_month": 500, "currency": "AED" },
+  "figures": { "month": { "validated": 5, "pending": 1, "invalid": 0, "merchant_incentive": 500, "agent_incentive": 500 }, "last_month": { … }, "all_time": { … },
+               "statement": { "month_key": "2026-11", "label": "November 2026", "validated": 5, "merchant_amount": 500, "agent_amount": 500, "merchant_pay_date": "15 Dec 2026", "agent_pay_date": "10 Dec 2026" } },
+  "recent_deals": [ { "id": "<sale id>", "date": "2026-11-14", "unit": "Apartment · Unit 1203 · Marina Gate 2", "validation_status": "validated", "contract_price": 95000, "agent": { "id": "…", "name": "…" }, "merchant_incentive": 100, "agent_incentive": 100 } ],
+  "accepted_at": "…", "created_at": "…", "updated_at": "…"
+}
+```
+
+`figures` and `recent_deals` come only with `include=deals`. `contact.account_id` is the merchant's FHI login, the same id the users route gives rentsouq.ae for auto-login. A closed deal is a **validated** Rental sale on FHI tagged with the merchant (`sales[].merchant` on the sales endpoint, `sales?merchant=M-4K7Q`); the QR opens `fhiglobal.ae/m/<code>`, which counts the scan and forwards to rentsouq.ae with `?ref=<code>`.
 
 ## Joining them
 

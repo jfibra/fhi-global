@@ -82,6 +82,15 @@ export const APP_ROLES = {
     tableBadge: { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
     shellBadge: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
   },
+  // A business in the Merchant Partnership Programme (migration 092): signed by
+  // an agent, shows a QR in its shop, earns per rental. Its own dashboard only.
+  merchant: {
+    dashboardBasePath: "/merchant",
+    adminLabel: "Merchant",
+    sidebarHexColor: "#0f766e",
+    tableBadge: { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" },
+    shellBadge: "bg-teal-500/20 text-teal-200 border-teal-500/30",
+  },
 } as const
 
 export type AppRoleId = keyof typeof APP_ROLES
@@ -99,6 +108,7 @@ export const APP_ROLE_ORDER: AppRoleId[] = [
   "team_secretary",
   "member",
   "global_partner",
+  "merchant",
 ]
 
 export function normalizeAppRole(role: string | null | undefined): string {
@@ -321,7 +331,23 @@ export const ROLES_SUPPORT_PORTAL: readonly AppRoleId[] = [...APP_ROLE_ORDER]
  * marketing artwork and training library. Derived rather than listed so a
  * future role is included by default and only developers stay out.
  */
-export const ROLES_INTERNAL_RESOURCES: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer")
+export const ROLES_INTERNAL_RESOURCES: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer" && r !== "merchant")
+
+/** A merchant account (the Merchant Partnership Programme, migration 092). */
+export function isMerchantRole(role: string | null | undefined): boolean {
+  return normalizeAppRole(role) === "merchant"
+}
+
+/**
+ * Who may sign merchants to the programme — share the merchant link, see
+ * "My merchants" and upload a merchant's documents for them: the whole sales
+ * ladder. Admin staff see every merchant from Accounts & Invites → Merchants.
+ */
+export const ROLES_MERCHANT_SIGNERS: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "global_partner"]
+
+export function canSignMerchants(role: string | null | undefined): boolean {
+  return roleInList(role, ROLES_MERCHANT_SIGNERS)
+}
 
 /**
  * Who may see the company Top Sales leaderboard (per-agent revenue).

@@ -8,6 +8,8 @@ import { inviterAutoApproves } from "@/lib/auto-approve"
 import { joinInvitersTeam } from "@/lib/recruit-team"
 import { sendWelcomeEmail } from "@/lib/welcome-email"
 import { checkPartnerSignupInfo, partnerInfoMetadata } from "@/lib/partner-signup"
+import { checkMerchantSignupInfo, merchantInfoMetadata } from "@/lib/merchant-signup"
+import { createMerchantRecord } from "@/lib/merchant/signup-server"
 
 // Completes Google sign-in AFTER the client established the Supabase session.
 // Runs as the newly-signed-in user (cookie session) and — only on the first
@@ -32,7 +34,7 @@ type ProfileRow = {
 }
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => null)) as { next?: unknown; ref?: unknown; type?: unknown; partnerInfo?: unknown } | null
+  const body = (await req.json().catch(() => null)) as { next?: unknown; ref?: unknown; type?: unknown; partnerInfo?: unknown; merchantInfo?: unknown } | null
   const nextRaw = typeof body?.next === "string" ? body.next : null
   // Referral/invite id from the register page's Google button. Attribution is
   // best-effort and only applied on first provision (see below).
@@ -41,6 +43,9 @@ export async function POST(req: NextRequest) {
   // answers (country they live in + WhatsApp) the page kept for this sign-in.
   const isPartnerInvite = typeof body?.type === "string" && body.type.trim().toLowerCase().replace(/-/g, "_") === "global_partner"
   const partner = isPartnerInvite ? checkPartnerSignupInfo(body?.partnerInfo) : null
+  // The merchant invite (lib/merchant-signup.ts): the business the page kept for this sign-in.
+  const isMerchantInvite = typeof body?.type === "string" && body.type.trim().toLowerCase() === "merchant"
+  const merchantCheck = isMerchantInvite ? checkMerchantSignupInfo(body?.merchantInfo) : null
 
   // Must be signed in (the client just established the session).
   const supabase = await createClient()
@@ -117,6 +122,15 @@ export async function POST(req: NextRequest) {
   if (isPartnerInvite && invitedBy && finalRole === "member" && finalStatus === "pending") {
     finalRole = "global_partner"
   }
+  // The merchant invite makes a brand-new account a merchant whose login is
+  // active at once (it must upload its documents; the admins gate the
+  // merchant record, migration 092). Without the business details or a real
+  // inviter it stays a pending member, like any other sign-up.
+  const becomesMerchant = isMerchantInvite && !!merchantCheck?.ok && !!invitedBy && finalRole === "member" && finalStatus === "pending"
+  if (becomesMerchant) {
+    finalRole = "merchant"
+    finalStatus = "active"
+  }
   // A pre-approved inviter's recruits (the CEO's link) start active — only a
   // brand-new, still-pending account; a status an admin set is never touched.
   let autoApproved = false
@@ -131,6 +145,7 @@ export async function POST(req: NextRequest) {
     google_provisioned: true,
     ...(invitedBy ? { invited_by: invitedBy } : {}),
     ...(partner?.ok ? partnerInfoMetadata(partner.info) : {}),
+    ...(becomesMerchant && merchantCheck?.ok ? merchantInfoMetadata(merchantCheck.info) : {}),
   }
 
   const { error: updateError } = await admin
@@ -154,8 +169,18 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  if (becomesMerchant && merchantCheck?.ok) {
+    try {
+      await createMerchantRecord(admin, { profileId: user.id, agentId: invitedBy, info: merchantCheck.info })
+    } catch (e) {
+      console.error("[google-finalize] merchant record", e)
+      return NextResponse.json({ error: "Could not set up your merchant record. Please try again." }, { status: 500 })
+    }
+  }
+
   // A recruit joins their recruiter's team (lib/recruit-team.ts). Best effort.
-  if (invitedBy) await joinInvitersTeam(admin, { userId: user.id, inviterId: invitedBy, accountRole: finalRole })
+  // A merchant is a client business, never a team member.
+  if (invitedBy && !becomesMerchant) await joinInvitersTeam(admin, { userId: user.id, inviterId: invitedBy, accountRole: finalRole })
 
   const displayName = [fname, lname].filter(Boolean).join(" ") || user.email || null
   if (autoApproved && invitedBy) {

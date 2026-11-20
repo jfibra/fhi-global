@@ -17,6 +17,14 @@ export const partnerInviteUrl = (origin: string, userId: string) => `${origin}/r
 export const partnerInviteShare = (url: string) =>
   `Become an FHI Global Partner — earn with Dubai real estate from anywhere. Register under my network here: ${url}`
 
+/**
+ * The Merchant Partnership Programme (migration 092): a business registers as
+ * a merchant under the agent, who earns AED 100 per rental through its QR.
+ */
+export const merchantInviteUrl = (origin: string, userId: string) => `${origin}/register?type=merchant&ref=${userId}`
+export const merchantInviteShare = (url: string) =>
+  `Hi! FHI Global and rentsouq.ae pay your business AED 100 for every customer of yours who rents a home through your own QR code, plus a voucher for them. Register your business here, it takes five minutes: ${url}`
+
 /** /buy-with/<name> (older links: /b/<code>) — a buyer's four-step brief. */
 export const buyersLinkUrl = (origin: string, link: { slug: string | null; code: string }) =>
   `${origin}${link.slug ? buyerLinkPath(link.slug) : `/b/${link.code}`}`
