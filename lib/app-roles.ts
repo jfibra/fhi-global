@@ -341,9 +341,11 @@ export function isMerchantRole(role: string | null | undefined): boolean {
 /**
  * Who may sign merchants to the programme — share the merchant link, see
  * "My merchants" and upload a merchant's documents for them: the whole sales
- * ladder. Admin staff see every merchant from Accounts & Invites → Merchants.
+ * ladder, and admin staff (the boss signs merchants too, 2026-11-21; their
+ * Invite page sits under Accounts & Invites). Admin staff also review every
+ * merchant from Accounts & Invites → Merchants.
  */
-export const ROLES_MERCHANT_SIGNERS: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "global_partner"]
+export const ROLES_MERCHANT_SIGNERS: readonly AppRoleId[] = ["agent", "team_leader", "unit_manager", "global_partner", "super_admin", "admin"]
 
 export function canSignMerchants(role: string | null | undefined): boolean {
   return roleInList(role, ROLES_MERCHANT_SIGNERS)

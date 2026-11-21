@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { ROLES_ADMIN_STAFF, isAdminStaffRole } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { getDashboardRouteByRole } from "@/lib/auth"
@@ -101,7 +101,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           agentName: agent.name,
           businessName: merchant.business_name,
           code,
-          dashboardUrl: `${SITE_URL.replace(/\/$/, "")}${getDashboardRouteByRole(agent.role)}/invite?view=merchants`,
+          // Admin staff's Invite page sits under the Accounts & Invites hub.
+          dashboardUrl: `${SITE_URL.replace(/\/$/, "")}${getDashboardRouteByRole(agent.role)}${isAdminStaffRole(agent.role) ? "/accounts" : ""}/invite?view=merchants`,
         })
         emailed.push("agent")
       }
