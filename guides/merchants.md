@@ -25,6 +25,10 @@ A **merchant** (restaurant, cleaner, hotel, spa, school, supermarket…) signs a
 
 Access is the ONE rule in `lib/merchant/access.ts`: the merchant reads its own record, the signing agent the merchants with its `agent_id`, admin staff any. No RLS reads: the pages go through `app/api/merchant/*`, `app/api/agent/merchants`, `app/api/admin/merchants/*`.
 
+## Reviewers
+
+Admin staff review merchants. So does any account an admin flags with `profiles.metadata.merchant_reviewer = true` (`canReviewMerchants` in `lib/app-roles.ts`; Michelle & Carlos Guinto's team-leader account since 2026-11-21): the sidebar row "Merchants" on their own dashboard (`requiresFlag` on the nav entry), the same review page and drawer, and the same `app/api/admin/merchants/*` routes behind `requireMerchantReviewer()`. Per person, never per role; there is no admin UI for the flag yet — set it on the profile's metadata.
+
 ## The role
 
 `merchant` is the tenth role (`lib/app-roles.ts`, dashboard `/merchant`, sidebar `MERCHANT_NAV`, `proxy.ts` matcher, `next.config.mjs` noindex). It is exempt from the complete-profile gate, the headshot gate and the BRN gate (a business, not an agent), and excluded from `ROLES_INTERNAL_RESOURCES`.

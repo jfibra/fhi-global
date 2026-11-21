@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF, isAdminStaffRole } from "@/lib/app-roles"
+import { requireMerchantReviewer } from "@/lib/merchant/access"
+import { isAdminStaffRole } from "@/lib/app-roles"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { getDashboardRouteByRole } from "@/lib/auth"
@@ -22,7 +22,7 @@ import { SITE_URL } from "@/lib/seo"
 export const runtime = "nodejs"
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const session = await requireRole([...ROLES_ADMIN_STAFF])
+  const session = await requireMerchantReviewer()
   if (!session.ok) return session.response
   const { id } = await ctx.params
   const body = (await req.json().catch(() => ({}))) as { note?: unknown; force?: unknown }

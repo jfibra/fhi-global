@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { requireMerchantReviewer } from "@/lib/merchant/access"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 import { openIban } from "@/lib/merchant/secrets"
@@ -19,7 +18,7 @@ export const dynamic = "force-dynamic"
 export type AdminMerchantDetail = MerchantMePayload & { iban: string | null }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const session = await requireRole([...ROLES_ADMIN_STAFF])
+  const session = await requireMerchantReviewer()
   if (!session.ok) return session.response
   const { id } = await ctx.params
   const admin = createAdminSupabase()

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { requireMerchantReviewer } from "@/lib/merchant/access"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { MERCHANT_COLUMNS, listRows, type MerchantRow } from "@/lib/merchant/service"
 import type { MerchantListRow } from "@/lib/merchant/types"
@@ -21,7 +20,7 @@ export type AdminMerchantsPayload = {
 }
 
 export async function GET() {
-  const session = await requireRole([...ROLES_ADMIN_STAFF])
+  const session = await requireMerchantReviewer()
   if (!session.ok) return session.response
   const admin = createAdminSupabase()
   try {

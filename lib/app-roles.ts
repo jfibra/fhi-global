@@ -352,6 +352,19 @@ export function canSignMerchants(role: string | null | undefined): boolean {
 }
 
 /**
+ * Who reviews merchants — sees every merchant, ticks the documents, reveals
+ * the IBAN, accepts and declines: admin staff, plus any account an admin
+ * flags with `profiles.metadata.merchant_reviewer = true` (Michelle Guinto,
+ * the team leader who runs the Dubai side, 2026-11-21). Per person, never per
+ * role, like the CEO's auto-approve flag.
+ */
+export const MERCHANT_REVIEWER_FLAG = "merchant_reviewer"
+
+export function canReviewMerchants(role: string | null | undefined, metadata: Record<string, unknown> | null | undefined): boolean {
+  return isAdminStaffRole(role) || metadata?.[MERCHANT_REVIEWER_FLAG] === true
+}
+
+/**
  * Who may see the company Top Sales leaderboard (per-agent revenue).
  *
  * Listed explicitly rather than derived by exclusion: ROLES_INTERNAL_RESOURCES

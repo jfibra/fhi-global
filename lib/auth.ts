@@ -113,6 +113,10 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   deals: ["merchant"],
   documents: ["merchant", ...ROLES_DOCUMENT_LIBRARY],
   business: ["merchant"],
+  // The merchant review page on a leader's own dashboard — the page itself keeps
+  // it to accounts flagged merchant_reviewer (canReviewMerchants); admins reach
+  // it under their Accounts & Invites hub.
+  merchants: ["team_leader", "unit_manager", "agent"],
 }
 
 export function getDashboardRouteByRole(role?: string | null) {

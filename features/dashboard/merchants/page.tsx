@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, RefreshCw, Search, Store } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { canReviewMerchants } from "@/lib/app-roles"
 import type { AdminMerchantsPayload } from "@/app/api/admin/merchants/route"
 import { AGENT_INCENTIVE_AED, MERCHANT_INCENTIVE_AED, fmtAed } from "@/lib/merchant/rules"
 import type { MerchantListRow } from "@/lib/merchant/types"
@@ -20,8 +20,9 @@ type Tab = "queue" | "active" | "all"
  * click opens the review drawer: documents, the IBAN, accept or decline.
  */
 export default function MerchantsAdminPage() {
-  const { role } = useAuth()
-  const allowed = useRequireAllowed(isAdminStaffRole(role))
+  const { role, profile } = useAuth()
+  // Admin staff, or the leader an admin flagged as a reviewer (metadata.merchant_reviewer).
+  const allowed = useRequireAllowed(canReviewMerchants(role, profile?.metadata))
   const [data, setData] = useState<AdminMerchantsPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)

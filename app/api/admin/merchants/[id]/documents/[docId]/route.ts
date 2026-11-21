@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth-guard"
-import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
+import { requireMerchantReviewer } from "@/lib/merchant/access"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 
@@ -12,7 +11,7 @@ import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
 export const runtime = "nodejs"
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string; docId: string }> }) {
-  const session = await requireRole([...ROLES_ADMIN_STAFF])
+  const session = await requireMerchantReviewer()
   if (!session.ok) return session.response
   const { id, docId } = await ctx.params
   const body = (await req.json().catch(() => ({}))) as { verified?: unknown }

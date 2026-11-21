@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { API_PAGE_OWNERS } from "@/lib/api-catalog"
 import {
+  MERCHANT_REVIEWER_FLAG,
   ROLE_DASHBOARD_MAP,
   getRoleSidebarHex,
   resolveAppRoleOrMember,
@@ -68,6 +69,8 @@ export interface NavEntry {
   requiresMailbox?: boolean
   /** Row only renders for these profile ids (one person's workbench, like the API page). */
   onlyUsers?: readonly string[]
+  /** Row only renders when the signed-in profile's metadata has this key set to true (a per-person grant). */
+  requiresFlag?: string
   /** One-liner under the label on the hub tile. Only used inside a group. */
   description?: string
   /** Which format mockup the hub tile shows (see hub-tile-mockups.tsx). */
@@ -329,6 +332,9 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
   ...(projects ? [PROJECTS] : []),
   // Global partners are recruited, they do not recruit — no Invite for them.
   ...(invite ? [INVITE] : []),
+  // The merchant review page (the admins' Accounts & Invites › Merchants), for the
+  // one leader an admin flagged as a reviewer (MERCHANT_REVIEWER_FLAG in app-roles.ts).
+  { icon: Store, label: "Merchants", to: "merchants", requiresFlag: MERCHANT_REVIEWER_FLAG },
   // Their whole recruitment tree, level by level ("genealogy" in SUB_PATH_ROLES).
   ...(invite ? [{ icon: GitBranch, label: "Genealogy", to: "genealogy" } satisfies NavEntry] : []),
   // Their network's performance: KPIs, who sold, every deal with filters ("my-team" in SUB_PATH_ROLES).
@@ -481,13 +487,14 @@ function listFor(role: string | null | undefined): RoleNavEntry[] {
 /** The sidebar rows for a role. Groups collapse to one row each. */
 export function getSidebarNavItems(
   role: string | null | undefined,
-  opts: { hasMailbox?: boolean; userId?: string | null } = {},
+  opts: { hasMailbox?: boolean; userId?: string | null; metadata?: Record<string, unknown> | null } = {},
 ): NavItem[] {
   const base = baseFor(role)
 
   return listFor(role)
     .filter((entry) => isGroup(entry) || !entry.requiresMailbox || opts.hasMailbox)
     .filter((entry) => isGroup(entry) || !entry.onlyUsers || (!!opts.userId && entry.onlyUsers.includes(opts.userId)))
+    .filter((entry) => isGroup(entry) || !entry.requiresFlag || opts.metadata?.[entry.requiresFlag] === true)
     .map((entry) => {
     if (!isGroup(entry)) {
       return { icon: entry.icon, label: entry.label, href: hrefFor(base, entry.to), badge: entry.badge }
