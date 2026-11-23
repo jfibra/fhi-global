@@ -418,11 +418,11 @@ export const ROLES_POSTER_MAKER: readonly AppRoleId[] = ["super_admin", "admin",
 export const ROLES_PROJECT_STUDIO_VIEWERS: readonly AppRoleId[] = ["agent", "global_partner", "team_leader", "unit_manager", "member"]
 
 /**
- * Photo Logo (put an FHI logo on a photo and download it, all in the browser):
- * every role except developers (external partners) and members (sign-ups who
- * don't sell). Derived so a future role is included by default.
+ * Ad Branding (logos + the ad permit on a photo or video, all in the browser),
+ * inside Agent Resource — so exactly the roles that have Agent Resource (admin
+ * staff + the sales ladder + global partners; see sidebar-config.ts).
  */
-export const ROLES_PHOTO_LOGO: readonly AppRoleId[] = APP_ROLE_ORDER.filter((r) => r !== "developer" && r !== "member")
+export const ROLES_AD_BRANDING: readonly AppRoleId[] = ["super_admin", "admin", "team_leader", "unit_manager", "agent", "global_partner"]
 
 /** Who may use the Website Builder (personal agent-site editor): admin staff + the sales pipeline. */
 export const ROLES_WEBSITE_BUILDER: readonly AppRoleId[] = ["super_admin", "admin", "agent", "global_partner", "team_leader", "unit_manager"]

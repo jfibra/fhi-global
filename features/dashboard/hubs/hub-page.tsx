@@ -23,5 +23,6 @@ export function HubPage({ hub }: { hub: string }) {
     )
   }
 
-  return <HubTileGrid title={resolved.title} tiles={resolved.tiles} />
+  // Agent Resource opens straight on its tiles — no "Agent Resource · N sections" heading.
+  return <HubTileGrid title={resolved.title} tiles={resolved.tiles} showHeader={hub !== "agent-resource"} />
 }

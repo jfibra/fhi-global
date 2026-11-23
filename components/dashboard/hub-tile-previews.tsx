@@ -21,7 +21,7 @@
 
 import { useEffect, useState, type ReactNode } from "react"
 import Image from "next/image"
-import { Check, FileText, Files, Globe, LifeBuoy, Play, QrCode, Star } from "lucide-react"
+import { Check, FileText, Files, Globe, Image as ImageIcon, LifeBuoy, Play, QrCode, Star, Video } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { useAuth } from "@/context/auth-context"
 import { EBOOKS, ebookCoverUrl } from "@/lib/ebooks"
@@ -30,6 +30,7 @@ import { SITE_URL } from "@/lib/seo"
 import { FormCover } from "@/components/form-cover"
 import { listDocuments, type DocumentRow } from "@/lib/document-service"
 import { formCoverHref } from "@/lib/forms-shared"
+import { PROFILE_THEMES } from "@/lib/profile-themes"
 
 // ─── Plumbing ─────────────────────────────────────────────────────────────────
 
@@ -148,42 +149,42 @@ function DocumentsPreview() {
 
 // ─── Agent Resource ───────────────────────────────────────────────────────────
 
-/** Two real card designs (Executive Noir over Gilded Arc), drawn by the card engine with sample data. */
+/** Three real card designs fanned (Pearl Prestige, Gilded Arc, Executive Noir), drawn by the card engine with sample data. */
 function BusinessCardPreview() {
-  const { data, ready } = useSample("business-card-sample:noir-arc", async () => {
+  const { data, ready } = useSample("business-card-sample:fan-3", async () => {
     const { renderCard, THUMB_W, THUMB_H } = await import("@/features/business-card/card-render")
     const sample = { name: "Juan Dela Cruz", phoneDial: "+971", phoneLocal: "501234567", email: "juan@fhiglobal.ae", avatarUrl: SAMPLE_PORTRAIT, initials: "JD" }
-    const [noir, arc] = await Promise.all([
-      renderCard("front", "noir", sample, THUMB_W, THUMB_H),
-      renderCard("front", "arc", sample, THUMB_W, THUMB_H),
-    ])
-    return { noir, arc }
+    return Promise.all((["platinum", "arc", "noir"] as const).map((d) => renderCard("front", d, sample, THUMB_W, THUMB_H)))
   })
   if (!ready) return <Loading />
   if (!data) return <Empty icon={FileText} text="Open to design your card" />
+  const place = ["left-0 top-1 -rotate-[10deg]", "right-0 top-6 rotate-[8deg]", "left-3 bottom-2 -rotate-2"]
+  const names = ["Pearl Prestige business card", "Gilded Arc business card", "Executive Noir business card"]
   return (
-    <div className="flex flex-col gap-1.5">
-      {[data.noir, data.arc].map((src, i) => (
+    <div className="relative h-[128px] w-[136px]">
+      {data.map((src, i) => (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={i} src={src} alt={i === 0 ? "Executive Noir business card" : "Gilded Arc business card"} className="h-[62px] w-[108px] rounded-md object-cover shadow-[0_4px_12px_rgba(0,31,63,0.18)]" />
+        <img key={i} src={src} alt={names[i]} className={`absolute h-[62px] w-[108px] rounded-md object-cover shadow-[0_6px_16px_rgba(0,31,63,0.25)] ${place[i]}`} />
       ))}
     </div>
   )
 }
 
-/** The digital card as it opens on a phone — the signed-in user's own name and
- *  photo on the real card layout: Dubai dusk backdrop, gold-ringed portrait,
- *  "Visit our website", the QR + contact panel, the gold action bar, WhatsApp. */
-function DigitalCardPreview() {
+/** The digital card as it opens on a phone, in one of its real designs
+ *  (PROFILE_THEMES in lib/profile-themes.ts — its photo, scrim, ink, accent and
+ *  pill colours): the signed-in user's own name and photo, "Visit our website",
+ *  the QR + contact panel, the action bar, WhatsApp. */
+function DigitalPhone({ themeId }: { themeId: string }) {
   const { user, profile } = useAuth()
+  const t = PROFILE_THEMES.find((x) => x.id === themeId) ?? PROFILE_THEMES[0]
   const name = profile?.fullname?.trim() || "Juan Dela Cruz"
   const photo = profile?.profile_url?.trim() || SAMPLE_PORTRAIT
   const email = user?.email ?? "juan@fhiglobal.ae"
   return (
-    <span className="relative flex h-[140px] w-[78px] flex-col items-center overflow-hidden rounded-[10px] bg-[#1a1612] p-1.5 pt-2.5 shadow-[0_6px_16px_rgba(0,31,63,0.3)] ring-2 ring-[#001f3f]">
-      <Image src="/background/developers.webp" alt="" fill sizes="100px" className="object-cover object-center opacity-90" />
-      <span className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/25 to-black/60" />
-      <span className="relative h-7 w-7 overflow-hidden rounded-full border-[1.5px] border-[#d6b357] shadow">
+    <span className="relative flex h-[136px] w-[76px] flex-col items-center overflow-hidden rounded-[10px] p-1.5 pt-2.5 shadow-[0_6px_16px_rgba(0,31,63,0.3)] ring-2 ring-[#001f3f]">
+      {t.image && <Image src={t.image} alt="" fill sizes="100px" className="object-cover object-center" />}
+      <span className="absolute inset-0" style={{ background: t.scrim }} />
+      <span className="relative h-7 w-7 overflow-hidden rounded-full border-[1.5px] shadow" style={{ borderColor: t.accent }}>
         {photo.startsWith("/") ? (
           <Image src={photo} alt="" fill sizes="40px" className="object-cover object-top" />
         ) : (
@@ -191,89 +192,145 @@ function DigitalCardPreview() {
           <img src={photo} alt="" className="h-full w-full object-cover object-top" />
         )}
       </span>
-      <span className="relative mt-1 max-w-full truncate font-['Outfit'] text-[7px] font-bold leading-none text-white">{name}</span>
-      <span className="relative mt-1.5 flex h-4 w-full items-center gap-1 rounded-full bg-[#fbf6ec] pl-0.5 pr-1">
-        <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[#c9a24a]"><Globe className="h-1.5 w-1.5 text-white" /></span>
-        <span className="flex-1 text-center text-[5px] font-bold text-[#1a1612]">Visit our website</span>
+      <span className="relative mt-1 max-w-full truncate font-['Outfit'] text-[7px] font-bold leading-none" style={{ color: t.ink }}>{name}</span>
+      <span className="relative mt-1.5 flex h-4 w-full items-center gap-1 rounded-full pl-0.5 pr-1" style={{ background: t.pillBg }}>
+        <span className="flex h-3 w-3 items-center justify-center rounded-full" style={{ background: t.tile }}><Globe className="h-1.5 w-1.5" style={{ color: t.tileInk }} /></span>
+        <span className="flex-1 text-center text-[5px] font-bold" style={{ color: t.pillInk }}>Visit our website</span>
       </span>
-      <span className="relative mt-1.5 flex w-full items-center gap-1 rounded-md bg-black/45 p-1 backdrop-blur-[2px]">
-        <span className="rounded-[2px] border border-[#d6b357] bg-white p-px">
+      <span className="relative mt-1.5 flex w-full items-center gap-1 rounded-md border p-1" style={{ background: t.panel, borderColor: t.panelBorder }}>
+        <span className="rounded-[2px] border bg-white p-px" style={{ borderColor: t.accent }}>
           <QRCodeSVG value={`${SITE_URL}/business-card`} size={20} level="L" fgColor="#1a1612" />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          {[["+971", true], [email, false], ["www.fhiglobal.ae", false]].map(([t, bold], i) => (
+          {[["+971", true], [email, false], ["www.fhiglobal.ae", false]].map(([text, bold], i) => (
             <span key={i} className="flex items-center gap-0.5">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#c9a24a]" />
-              <span className={`truncate text-[4.5px] leading-none ${bold ? "font-bold text-white" : "text-white/75"}`}>{String(t)}</span>
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: t.accent }} />
+              <span className={`truncate text-[4.5px] leading-none ${bold ? "font-bold" : ""}`} style={{ color: bold ? t.ink : t.inkMuted }}>{String(text)}</span>
             </span>
           ))}
         </span>
       </span>
-      <span className="relative mt-1.5 flex h-3.5 w-full items-center justify-around rounded-full bg-[#d6b357] px-1 text-[4.5px] font-extrabold uppercase text-[#1a1612]">
-        <span>Save</span><span className="h-2 w-px bg-black/20" /><span>Share</span><span className="h-2 w-px bg-black/20" /><span>Contact</span>
+      <span className="relative mt-1.5 flex h-3.5 w-full items-center justify-around rounded-full px-1 text-[4.5px] font-extrabold uppercase" style={{ background: t.pillBg, color: t.pillInk }}>
+        <span>Save</span><span className="h-2 w-px bg-current opacity-25" /><span>Share</span><span className="h-2 w-px bg-current opacity-25" /><span>Contact</span>
       </span>
-      <span className="relative mt-auto flex h-4 w-4 items-center justify-center rounded-full bg-black/55 ring-1 ring-white/20">
+      <span className="relative mt-auto flex h-4 w-4 items-center justify-center rounded-full bg-[#25d366]">
         <svg viewBox="0 0 24 24" className="h-2.5 w-2.5 fill-white"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 2a8 8 0 1 1-4.2 14.8l-.3-.2-2.9.8.8-2.8-.2-.3A8 8 0 0 1 12 4zm-3 4.5c-.2 0-.5 0-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.2 5 4.4 2.5 1 3 .8 3.5.7.5 0 1.7-.7 2-1.4.2-.7.2-1.2.1-1.4l-.5-.2-1.9-.9c-.3-.1-.4-.2-.6.1l-.9 1.1c-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.4.1-.6l.4-.5.3-.5v-.5l-.9-2c-.2-.5-.4-.5-.6-.5z"/></svg>
       </span>
     </span>
   )
 }
 
-/** The reel the studio opens with: its own sample photo in a 9:16 frame. */
-function ReelsPreview() {
+/** Two of the digital card's real designs fanned like the posters: Pearl (the
+ *  light one) behind, Skyline (Dubai at golden hour) in front. */
+function DigitalCardPreview() {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="relative block h-[136px] w-[76px] overflow-hidden rounded-[10px] bg-[#0a2136] shadow-[0_6px_16px_rgba(0,31,63,0.3)] ring-2 ring-[#001f3f]">
-        <Image src="/images/house.jpg" alt="Reel sample" fill sizes="80px" className="object-cover" />
-        <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-        <Image src="/FHI_Branding_White.png" alt="" width={28} height={10} className="absolute left-1.5 top-1.5 h-auto w-6" />
-        <span className="absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90">
-          <Play className="ml-px h-3 w-3 fill-[#001f3f] text-[#001f3f]" />
-        </span>
-        <span className="absolute bottom-3 left-1.5 right-1.5">
-          <span className="block text-[6px] font-bold text-white">Luxury villa · Dubai Hills</span>
-          <span className="block text-[5.5px] text-[#d6b357]">AED 4.2M · 5 beds</span>
-        </span>
-        <span className="absolute inset-x-0 bottom-0 h-[3px] bg-white/25"><span className="block h-full w-2/3 bg-[#d6b357]" /></span>
-      </span>
-      <span className="flex flex-col gap-1">
-        {["/images/house 2.jpg", "/images/properties.jpg"].map((p) => (
-          <span key={p} className="relative block h-9 w-7 overflow-hidden rounded border border-white shadow">
-            <Image src={p} alt="" fill sizes="40px" className="object-cover" />
-          </span>
-        ))}
-      </span>
+    <div className="relative h-[146px] w-[136px]">
+      <span className="absolute left-0 top-2 -rotate-[8deg]"><DigitalPhone themeId="pearl" /></span>
+      <span className="absolute right-0 top-0 rotate-[6deg]"><DigitalPhone themeId="skyline" /></span>
     </div>
   )
 }
 
-/** A real studio job, one column: the bare room it started from, the
- *  before/after comparison, and the staged result (public/hub-samples). */
-function PhotoStudioPreview() {
-  const rows = [
-    { src: "/hub-samples/photo-studio-before.jpg", alt: "Original photo" },
-    { src: "/hub-samples/photo-studio-split.jpg", alt: "Before and after comparison" },
-    { src: "/hub-samples/photo-studio-after.jpg", alt: "Staged with AI" },
+/** Reels from the studio fanned like the posters: three 9:16 reels, the front one playing. */
+function ReelsPreview() {
+  const reels = [
+    { photo: "/images/house 2.jpg", title: "Townhouse · JVC", price: "AED 1.8M · 3 beds", className: "left-0 top-3 -rotate-[9deg]", front: false },
+    { photo: "/images/properties.jpg", title: "Apartment · Marina", price: "AED 1.2M · 2 beds", className: "right-0 top-3 rotate-[9deg]", front: false },
+    { photo: "/images/house.jpg", title: "Luxury villa · Dubai Hills", price: "AED 4.2M · 5 beds", className: "left-1/2 top-0 -translate-x-1/2", front: true },
   ]
   return (
-    <div className="flex w-[112px] flex-col gap-1.5">
-      {rows.map((r) => (
-        <span key={r.src} className={`${sheet} relative block h-[42px] w-full border-0`}>
-          <Image src={r.src} alt={r.alt} fill sizes="120px" className="object-cover" />
+    <div className="relative h-[140px] w-[136px]">
+      {reels.map(({ photo, title, price, className, front }) => (
+        <span key={photo} className={`absolute block h-[124px] w-[68px] overflow-hidden rounded-[10px] bg-[#0a2136] shadow-[0_6px_16px_rgba(0,31,63,0.3)] ring-2 ring-[#001f3f] ${className}`}>
+          <Image src={photo} alt={front ? "Reel sample" : ""} fill sizes="80px" className="object-cover" />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
+          <Image src="/FHI_Branding_White.png" alt="" width={28} height={10} className="absolute left-1.5 top-1.5 h-auto w-5" />
+          {front && (
+            <span className="absolute left-1/2 top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90">
+              <Play className="ml-px h-2.5 w-2.5 fill-[#001f3f] text-[#001f3f]" />
+            </span>
+          )}
+          <span className="absolute bottom-2.5 left-1.5 right-1.5">
+            <span className="block truncate text-[5.5px] font-bold text-white">{title}</span>
+            <span className="block text-[5px] text-[#d6b357]">{price}</span>
+          </span>
+          <span className="absolute inset-x-0 bottom-0 h-[3px] bg-white/25"><span className={`block h-full bg-[#d6b357] ${front ? "w-2/3" : "w-1/4"}`} /></span>
         </span>
       ))}
     </div>
   )
 }
 
-/** A real birthday card from the studio beside a listing flyer with the studio's sample photo. */
+/** A real studio job fanned like the posters: the bare room behind, the
+ *  before/after split, and the AI-staged result in front (public/hub-samples). */
+function PhotoStudioPreview() {
+  const cards = [
+    { src: "/hub-samples/photo-studio-before.jpg", alt: "Original photo", tag: "Before", className: "left-0 top-0 -rotate-[7deg]" },
+    { src: "/hub-samples/photo-studio-split.jpg", alt: "Before and after comparison", tag: "Compare", className: "right-0 top-8 rotate-[6deg]" },
+    { src: "/hub-samples/photo-studio-after.jpg", alt: "Staged with AI", tag: "AI staged", className: "left-2 bottom-0 -rotate-1" },
+  ]
+  return (
+    <div className="relative h-[140px] w-[136px]">
+      {cards.map((c) => (
+        <span key={c.src} className={`${sheet} absolute block h-[62px] w-[104px] ${c.className}`}>
+          <Image src={c.src} alt={c.alt} fill sizes="120px" className="object-cover" />
+          <span className="absolute right-[3px] top-[3px] rounded-full bg-white/90 px-[4px] py-[1px] text-[4.5px] font-bold uppercase text-[#001f3f]">{c.tag}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Ad Branding: branded property ads fanned out like the poster samples — three
+ *  portrait posts behind (photos and videos) and two landscape ones in front,
+ *  each with a logo and the ad permit, and a Photo / Video tag. */
+function AdBrandingPreview() {
+  const ads = [
+    { photo: "/images/house 2.jpg", logo: "/logos/ad-branding/homes-ph-light.png", kind: "photo", className: "left-0 top-0 h-[96px] w-[56px] -rotate-[8deg]" },
+    { photo: "/images/properties.jpg", logo: "/logos/ad-branding/filipinohomes-light.png", kind: "video", className: "right-0 top-0 h-[96px] w-[56px] rotate-[8deg]" },
+    { photo: "/johndorf/houses/pool.jpg", logo: "/logos/FHI_Branding_White.png", kind: "video", className: "left-1/2 -top-1 h-[100px] w-[58px] -translate-x-1/2" },
+    { photo: "/background/dubai.webp", logo: "/logos/ad-branding/homes-ph-light.png", kind: "video", className: "bottom-6 left-0 h-[60px] w-[100px] -rotate-[5deg]" },
+    { photo: "/images/house.jpg", logo: "/logos/FHI_Branding_White.png", kind: "photo", className: "bottom-0 right-0 h-[60px] w-[100px] rotate-[3deg]" },
+  ] as const
+  return (
+    <div className="relative h-[140px] w-[132px]">
+      {ads.map(({ photo, logo, kind, className }) => (
+        <span key={photo} className={`${sheet} absolute block ${className}`}>
+          <Image src={photo} alt="" fill sizes="110px" className="object-cover" />
+          <span className="absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-black/45 to-transparent" />
+          <span className="absolute left-[4px] top-[4px] block h-[8px] w-[34px]">
+            <Image src={logo} alt="" fill sizes="50px" className="object-contain object-left" />
+          </span>
+          <span className="absolute right-[3px] top-[3px] flex items-center gap-[1.5px] rounded-full bg-white/90 px-[3px] py-[1px] text-[4px] font-bold uppercase text-[#001f3f]">
+            {kind === "video" ? <Video className="h-[5px] w-[5px]" /> : <ImageIcon className="h-[5px] w-[5px]" />}
+            {kind}
+          </span>
+          {kind === "video" && (
+            <span className="absolute left-1/2 top-1/2 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 shadow">
+              <Play className="ml-[1px] h-2 w-2 fill-[#001f3f] text-[#001f3f]" />
+            </span>
+          )}
+          <span className="absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-black/45 to-transparent" />
+          <span className="absolute inset-x-0 bottom-[3px] text-center text-[3.4px] font-bold text-white [text-shadow:0_0_1px_#000,0_0_1px_#000]">
+            FHI Global Ad Permit No. 145225
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Posters from the studios fanned out: a birthday card, a listing flyer and a brand poster. */
 function PosterMakerPreview() {
   return (
-    <div className="relative h-[136px] w-[108px]">
-      <span className={`${sheet} absolute left-0 top-1 block h-[120px] w-[66px] -rotate-6`}>
+    <div className="relative h-[140px] w-[136px]">
+      <span className={`${sheet} absolute left-0 top-3 block h-[112px] w-[62px] -rotate-[9deg]`}>
         <Image src="/images/birthday1.png" alt="Birthday poster" fill sizes="80px" className="object-cover object-top" />
       </span>
-      <span className={`${sheet} absolute right-0 top-3 flex h-[116px] w-[62px] rotate-6 flex-col`}>
+      <span className={`${sheet} absolute left-1/2 top-0 block h-[112px] w-[66px] -translate-x-1/2`}>
+        <Image src="/images/homes-poster.png" alt="Brand poster" fill sizes="80px" className="object-cover object-top" />
+      </span>
+      <span className={`${sheet} absolute right-0 top-4 flex h-[112px] w-[62px] rotate-[9deg] flex-col`}>
         <span className="relative block h-[56%] w-full">
           <Image src="/images/house.jpg" alt="" fill sizes="80px" className="object-cover" />
           <span className="absolute left-0 top-1 bg-[#d6b357] px-1 text-[5px] font-bold uppercase tracking-wide text-[#001f3f]">For sale</span>
@@ -293,40 +350,72 @@ function PosterMakerPreview() {
   )
 }
 
-/** A real Business Meeting poster made with the tool (square, three speakers). */
+/** A real Business Meeting poster made with the tool (square, three speakers),
+ *  fanned with the same poster as a story on a phone and in a WhatsApp chat. */
 function MeetingPosterPreview() {
+  const poster = "/hub-samples/meeting-poster-v2.jpg"
   return (
-    <span className={`${sheet} block border-0`}>
-      <Image src="/hub-samples/meeting-poster-v2.jpg" alt="Business Meeting poster" width={112} height={112} className="block h-[112px] w-[112px] object-cover" />
-    </span>
+    <div className="relative h-[140px] w-[136px]">
+      {/* As a story on a phone */}
+      <span className="absolute right-0 top-0 flex h-[120px] w-[66px] rotate-[8deg] flex-col items-center justify-center overflow-hidden rounded-[10px] bg-[#0d1b2e] shadow-[0_6px_16px_rgba(0,31,63,0.3)] ring-2 ring-[#001f3f]">
+        <span className="absolute inset-x-1.5 top-1.5 flex gap-0.5">{[0, 1, 2].map((i) => <span key={i} className={`h-[2px] flex-1 rounded ${i === 0 ? "bg-white" : "bg-white/35"}`} />)}</span>
+        <span className="relative block h-[62px] w-[62px]"><Image src={poster} alt="" fill sizes="70px" className="object-cover" /></span>
+        <span className="mt-1.5 rounded-full bg-[#d6b357] px-1.5 py-[1px] text-[4.5px] font-bold text-[#001f3f]">Register now</span>
+      </span>
+      {/* Shared in a chat */}
+      <span className="absolute left-0 top-4 flex h-[96px] w-[62px] -rotate-[8deg] flex-col gap-1 overflow-hidden rounded-[10px] bg-[#e7ddd3] p-1.5 shadow-[0_6px_16px_rgba(0,31,63,0.25)] ring-2 ring-[#001f3f]">
+        <span className="h-2 w-9 rounded-sm bg-[#075e54]" />
+        <span className="ml-auto block w-[44px] overflow-hidden rounded-[4px] bg-[#dcf8c6] p-[2px] shadow-sm">
+          <span className="relative block h-[40px] w-full"><Image src={poster} alt="" fill sizes="50px" className="object-cover" /></span>
+          <span className="block px-[1px] pt-[1px] text-[3.8px] text-[#1a1612]">See you there!</span>
+        </span>
+      </span>
+      {/* The poster itself, in front */}
+      <span className={`${sheet} absolute bottom-0 left-1/2 block h-[84px] w-[84px] -translate-x-1/2 border-0`}>
+        <Image src={poster} alt="Business Meeting poster" fill sizes="100px" className="object-cover" />
+      </span>
+    </div>
   )
 }
 
-/** The sample agent site in a small browser window (the builder's own demo template). */
+/** The Website Builder's sample site (fhiglobal.ae/website/sample) as it looks
+ *  on a PC: two browser windows, like the poster samples — the top of the page
+ *  in front and the next screen (About + Featured Projects) behind it.
+ *  Real desktop screenshots (1440 px wide), saved in public/hub-samples. */
 function WebsiteBuilderPreview() {
-  return (
-    <span className={`${sheet} flex w-[112px] flex-col`}>
-      <span className="flex h-2.5 items-center gap-[2.5px] bg-[#d6b357]/20 px-1.5">
-        {[0, 1, 2].map((i) => <span key={i} className="h-[3.5px] w-[3.5px] rounded-full bg-[#b7913a]/70" />)}
+  const browser = (src: string, alt: string, className: string) => (
+    <span className={`${sheet} absolute flex w-[124px] flex-col ${className}`}>
+      <span className="flex h-[7px] items-center gap-[2px] bg-[#eef0f3] px-[3px]">
+        {["#ff5f57", "#febc2e", "#28c840"].map((c) => <span key={c} className="h-[3px] w-[3px] rounded-full" style={{ background: c }} />)}
+        <span className="ml-[3px] h-[3px] flex-1 rounded-full bg-white" />
       </span>
-      <Image src="/hub-samples/website.jpg" alt="Sample agent website" width={112} height={59} className="block h-[59px] w-full object-cover object-top" />
-      <span className="flex gap-[3px] p-[3px]">
-        {["/johndorf/houses/pool.jpg", "/johndorf/houses/townhouse-peach.jpg"].map((p) => (
-          <span key={p} className="relative block h-6 w-1/2 overflow-hidden rounded-[2px]">
-            <Image src={p} alt="" fill sizes="60px" className="object-cover" />
-          </span>
-        ))}
-      </span>
+      <Image src={src} alt={alt} width={124} height={78} className="block h-[78px] w-[124px] object-cover object-top" />
     </span>
+  )
+  return (
+    <div className="relative h-[146px] w-[150px]">
+      {browser("/hub-samples/website-desktop-more.jpg", "", "right-0 bottom-0 rotate-3")}
+      {browser("/hub-samples/website-desktop-top.jpg", "Sample agent website", "left-0 top-0 -rotate-3")}
+    </div>
   )
 }
 
-/** Page 1 of the agreement, as the generator produces it. */
+/** The agreement as the generator produces it, fanned like the posters: the
+ *  later pages behind, page 1 in front. */
 function A2APreview() {
+  const page = "/hub-samples/a2a-agreement.jpg"
   return (
-    <span className={`${sheet} block`}>
-      <Image src="/hub-samples/a2a-agreement.jpg" alt="Agent-to-agent agreement sample" width={92} height={130} className="block h-[130px] w-[92px] object-cover object-top" />
-    </span>
+    <div className="relative h-[140px] w-[136px]">
+      <span className={`${sheet} absolute left-0 top-3 block h-[118px] w-[84px] -rotate-[8deg]`}>
+        <Image src={page} alt="" fill sizes="90px" className="object-cover object-bottom" />
+      </span>
+      <span className={`${sheet} absolute right-0 top-3 block h-[118px] w-[84px] rotate-[8deg]`}>
+        <Image src={page} alt="" fill sizes="90px" className="object-cover object-center" />
+      </span>
+      <span className={`${sheet} absolute left-1/2 top-0 block h-[126px] w-[90px] -translate-x-1/2`}>
+        <Image src={page} alt="Agent-to-agent agreement sample" fill sizes="100px" className="object-cover object-top" />
+      </span>
+    </div>
   )
 }
 
@@ -473,6 +562,7 @@ const PREVIEWS: Record<string, () => ReactNode> = {
   "website-builder": () => <WebsiteBuilderPreview />,
   "a2a-agreement": () => <A2APreview />,
   "buyers-link": () => <BuyersLinkPreview />,
+  "ad-branding": () => <AdBrandingPreview />,
   // Communication (admin)
   "contact-inbox": () => <ContactInboxPreview />,
   "buyer-leads": () => <BuyerLeadsPreview />,

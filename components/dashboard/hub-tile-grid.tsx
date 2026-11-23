@@ -16,18 +16,22 @@ import { TilePreview, hasTilePreview } from "@/components/dashboard/hub-tile-pre
  * hub keeps the original vertical tile with its small format mockup
  * (hub-tile-mockups.tsx).
  */
-export function HubTileGrid({ title, tiles }: { title: string; tiles: HubTile[] }) {
+export function HubTileGrid({ title, tiles, showHeader = true }: { title: string; tiles: HubTile[]; showHeader?: boolean }) {
   const sampled = tiles.some((t) => hasTilePreview(t.preview))
 
   return (
     <div>
-      <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">{title}</h2>
-      <p className="mt-1 text-sm text-[#6b7280]">
-        {tiles.length} {tiles.length === 1 ? "section" : "sections"}
-      </p>
+      {showHeader && (
+        <>
+          <h2 className="font-['Outfit'] text-2xl font-bold text-[#0d1117]">{title}</h2>
+          <p className="mt-1 text-sm text-[#6b7280]">
+            {tiles.length} {tiles.length === 1 ? "section" : "sections"}
+          </p>
+        </>
+      )}
 
       {sampled ? (
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className={`${showHeader ? "mt-6 " : ""}grid auto-rows-fr gap-4 md:grid-cols-2`}>
           {tiles.map(({ icon: Icon, label, href, description, preview }) => (
             <Link
               key={href}
@@ -42,7 +46,7 @@ export function HubTileGrid({ title, tiles }: { title: string; tiles: HubTile[] 
                 <h3 className="mt-4 font-['Outfit'] text-lg font-bold leading-snug text-[#0d1117]">{label}</h3>
 
                 {description && (
-                  <p className="mt-1 flex-1 text-sm leading-relaxed text-[#6b7280]">{description}</p>
+                  <p className="mt-1 flex-1 truncate text-sm leading-relaxed text-[#6b7280]" title={description}>{description}</p>
                 )}
 
                 <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#0d1117] transition-colors group-hover:text-[#b7913a]">
@@ -52,18 +56,24 @@ export function HubTileGrid({ title, tiles }: { title: string; tiles: HubTile[] 
               </div>
 
               {/* The real sample of what this tool produces. */}
-              <div className="flex w-[136px] shrink-0 items-center justify-center self-stretch overflow-hidden rounded-xl border border-[#d6b357]/20 bg-[#d6b357]/[0.06] p-2 transition-transform duration-300 group-hover:scale-[1.04]">
-                {hasTilePreview(preview) ? (
-                  <TilePreview kind={preview} />
-                ) : (
-                  <Icon className="h-10 w-10 text-[#d6b357]/60" />
-                )}
+              {/* Out of the flow (absolute), so the card is only as tall as the text on the
+                  left; the sample is scaled to sit inside that height. */}
+              <div className="relative w-[136px] shrink-0 self-stretch">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="origin-center scale-[0.85] transition-transform duration-300 group-hover:scale-[0.89]">
+                    {hasTilePreview(preview) ? (
+                      <TilePreview kind={preview} />
+                    ) : (
+                      <Icon className="h-10 w-10 text-[#d6b357]/60" />
+                    )}
+                  </div>
+                </div>
               </div>
             </Link>
           ))}
         </div>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className={`${showHeader ? "mt-6 " : ""}grid gap-4 sm:grid-cols-2 xl:grid-cols-3`}>
           {tiles.map(({ icon: Icon, label, href, description, mock }) => (
             <Link
               key={href}

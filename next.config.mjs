@@ -357,6 +357,13 @@ const nextConfig = {
         destination: "/:slug",
         permanent: true,
       },
+      // Photo Logo was renamed Ad Branding (2026-11-23, it does videos too) and
+      // moved inside Agent Resource the same day.
+      {
+        source: "/:role(admin|superadmin|agent|teamleader|unitmanager|globalpartner)/:old(photo-logo|ad-branding)",
+        destination: "/:role/agent-resource/ad-branding",
+        permanent: false,
+      },
       // Staff sign-in moved from /login to /staff-login. Temporary redirect keeps
       // existing bookmarks/links working; the target is noindexed either way.
       {

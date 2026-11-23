@@ -153,10 +153,10 @@ const EBOOKS: NavEntry = { icon: Library, label: "Ebooks", to: "ebooks" }
 const VIDEOS: NavEntry = { icon: MonitorPlay, label: "Videos", to: "videos" }
 // Owner document intake (NOC / Trakheesi) — sales pipeline + admin. Access is
 // gated by SUB_PATH_ROLES["owner-documents"] in lib/auth.ts.
-// Put an FHI logo on a photo and download it — all in the browser, nothing
-// uploaded (features/dashboard/photo-logo). Every role but developer and
-// member (ROLES_PHOTO_LOGO, SUB_PATH_ROLES["photo-logo"]); always the last row.
-const PHOTO_LOGO: NavEntry = { icon: Stamp, label: "Photo Logo", to: "photo-logo" }
+// Ad Branding: logos + the ad permit on an agent's own photo or video, all in
+// the browser, nothing uploaded (features/dashboard/ad-branding). Lives inside
+// Agent Resource — a role without Agent Resource has no Ad Branding.
+const AD_BRANDING: NavEntry = { icon: Stamp, label: "Ad Branding", to: "ad-branding" }
 const OWNER_DOCUMENTS: NavEntry = { icon: FileSignature, label: "Owner Documents", to: "owner-documents" }
 
 // ─── Per-role lists ───────────────────────────────────────────────────────────
@@ -232,15 +232,16 @@ const ADMIN_NAV: RoleNavEntry[] = [
     to: "agent-resource",
     icon: FileText,
     items: [
-      { ...BUSINESS_CARD,  description: "Your shareable digital business card.", preview: "business-card" },
-      { ...DIGITAL_CARD, description: "The one link you share — contacts, socials and QR.", preview: "digital-business-card" },
-      { ...REELS_MAKER,   description: "Turn a listing or project into a shareable reel.", preview: "reels-maker" },
-      { ...PHOTO_STUDIO, description: "Stage a photo with AI — add people, furniture or landscaping.", preview: "photo-studio" },
-      { ...POSTER_MAKER,  description: "Flyers and posters from any listing or project.", preview: "poster-maker" },
-      { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", preview: "meeting-poster" },
       { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", preview: "website-builder" },
+      { ...AD_BRANDING,     description: "Put logos and the ad permit on your own photo or video.", preview: "ad-branding" },
+      { ...REELS_MAKER,     description: "Turn a listing or project into a shareable reel.", preview: "reels-maker" },
+      { ...PHOTO_STUDIO,    description: "Stage a photo with AI — add people, furniture or landscaping.", preview: "photo-studio" },
       { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", preview: "a2a-agreement" },
-      { ...BUYERS_LINK,     description: "Links for buyers and sellers — their brief comes straight to you.", preview: "buyers-link" },
+      { ...BUYERS_LINK,     description: "Buyer and seller links — briefs come to you.", preview: "buyers-link" },
+      { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project.", preview: "poster-maker" },
+      { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", preview: "meeting-poster" },
+      { ...BUSINESS_CARD,   description: "Your shareable digital business card.", preview: "business-card" },
+      { ...DIGITAL_CARD,    description: "The one link you share — contacts, socials and QR.", preview: "digital-business-card" },
     ],
   },
   {
@@ -279,7 +280,6 @@ const ADMIN_NAV: RoleNavEntry[] = [
   // upload route runs. Admin staff only; safe to remove once that pipeline's
   // behavior is no longer in question.
   { icon: UploadCloud, label: "Upload Test", to: "upload-test" },
-  PHOTO_LOGO,
 ]
 
 /** Content-only role: developers + projects, no admin powers. */
@@ -290,7 +290,6 @@ const EDITOR_NAV: RoleNavEntry[] = [
   MATERIALS,
   EBOOKS,
   VIDEOS,
-  PHOTO_LOGO,
 ]
 
 /** External developer partners — their own company and projects only. */
@@ -358,13 +357,14 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
     to: "agent-resource",
     icon: FileText,
     items: [
+      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", preview: "website-builder" },
+      { ...AD_BRANDING,     description: "Put logos and the ad permit on your own photo or video.", preview: "ad-branding" },
+      { ...REELS_MAKER,     description: "Turn a listing or project into a shareable reel.", preview: "reels-maker" },
+      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", preview: "a2a-agreement" },
+      { ...BUYERS_LINK,     description: "Buyer and seller links — briefs come to you.", preview: "buyers-link" },
+      { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project.", preview: "poster-maker" },
       { ...BUSINESS_CARD,   description: "Your shareable digital business card.", preview: "business-card" },
       { ...DIGITAL_CARD,    description: "The one link you share — contacts, socials and QR.", preview: "digital-business-card" },
-      { ...REELS_MAKER,     description: "Turn a listing or project into a shareable reel.", preview: "reels-maker" },
-      { ...POSTER_MAKER,    description: "Flyers and posters from any listing or project.", preview: "poster-maker" },
-      { ...WEBSITE_BUILDER, description: "Build and edit your personal agent website.", preview: "website-builder" },
-      { ...A2A_AGREEMENT,   description: "Fillable agent-to-agent collaboration agreement.", preview: "a2a-agreement" },
-      { ...BUYERS_LINK,     description: "Links for buyers and sellers — their brief comes straight to you.", preview: "buyers-link" },
     ],
   },
   // Marketing artwork + training PDFs, grouped under one hub.
@@ -379,7 +379,6 @@ const salesPipelineNav = ({ projects = false, teamSales = false, invite = true, 
       ...(documents ? [{ ...DOCUMENTS, description: "DLD forms, agreements and company templates — fill in and download.", preview: "documents" }] : []),
     ],
   },
-  PHOTO_LOGO,
 ]
 
 /** secretary + team_secretary — paperwork support, no listings of their own. */
@@ -392,7 +391,6 @@ const SECRETARY_NAV: RoleNavEntry[] = [
   MATERIALS,
   EBOOKS,
   VIDEOS,
-  PHOTO_LOGO,
 ]
 
 /** Signed-up public users: browse, plus the self-serve tools. */
