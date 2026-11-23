@@ -219,7 +219,7 @@ export default function ApiPage() {
                 <ol className="mt-1 list-decimal space-y-0.5 pl-5">
                   <li>Customize → Connectors → Add → Add custom connector.</li>
                   <li>Name: FHI Global. URL: <code className="font-mono text-[12.5px]">{status?.site ?? base}/api/mcp</code>.</li>
-                  <li>Authentication: no sign-in, and add a request header <code className="font-mono text-[12.5px]">Authorization</code> with the value <code className="font-mono text-[12.5px]">Bearer &lt;key&gt;</code>.</li>
+                  <li>Authentication: no sign-in, and add a request header <code className="font-mono text-[12.5px]">Authorization</code> with the value <code className="font-mono text-[12.5px]">Bearer &lt;key&gt;</code>. If the connector settings offer no header field, use the URL <code className="font-mono text-[12.5px]">{status?.site ?? base}/api/mcp?key=&lt;key&gt;</code> instead.</li>
                   <li>Add, then ask Claude anything about FHI&apos;s data.</li>
                 </ol>
               </div>

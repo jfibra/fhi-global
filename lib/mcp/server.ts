@@ -194,6 +194,9 @@ async function callEndpoint(handler: Handler, path: string, args: Record<string,
     } catch {
       // not JSON
     }
+    if (res.status === 401) {
+      message = "This connector has no FHI key. In its settings add a request header named Authorization with the value `Bearer <key>` (the key is on the FHI API page), or put ?key=<key> at the end of the server URL."
+    }
     return { content: [{ type: "text" as const, text: `FHI answered ${res.status}: ${message}` }], isError: true }
   }
   return { content: [{ type: "text" as const, text }] }

@@ -423,7 +423,7 @@ Where to plug it in:
 - **Claude Code** — `claude mcp add --transport http fhi https://fhiglobal.ae/api/mcp --header "Authorization: Bearer <key>"`, then `/mcp` shows it connected.
 - **FH ONE (Messages API)** — the MCP connector: `mcp_servers: [{ type: "url", url: "https://fhiglobal.ae/api/mcp", name: "fhi", authorization_token: "<key>" }]` plus `tools: [{ type: "mcp_toolset", mcp_server_name: "fhi" }]` with the beta header `mcp-client-2025-11-20`.
 
-Without the key the endpoint answers 401 with a `WWW-Authenticate` challenge; with no key configured on the server, 503. Anyone holding the key sees everything the key sees, so give it only to accounts that may read sales and client names.
+The handshake and the tool list are open (claude.ai probes a "no sign-in" connector without credentials and refuses to add it on a 401); every tool call needs the key and answers with a plain message saying where to put it when it is missing. The key can also ride on the server URL as `?key=<key>` for a client that cannot send headers. With no key configured on the server the tools answer 503. Anyone holding the key sees everything the key sees, so give it only to accounts that may read sales and client names.
 
 ## Joining them
 
