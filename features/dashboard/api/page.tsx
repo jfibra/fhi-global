@@ -17,6 +17,15 @@ import { API_ENDPOINTS, canSeeApiPage, type ApiEndpoint } from "@/lib/api-catalo
 
 type Status = { configured: boolean; key: string | null; site: string; environment: string }
 
+/** Questions that show what the connector can answer — the admin FHI Assistant's tools behind the MCP (lib/mcp/server.ts). */
+const CLAUDE_QUESTIONS = [
+  "How many visitors did the website get this week, and where did they come from?",
+  "Which Google keywords bring people to fhiglobal.ae?",
+  "What is waiting for validation in the sales pipeline?",
+  "Who has a birthday in the next two weeks?",
+  "Which support tickets are still open?",
+]
+
 function CopyButton({ text, label = "Copy", className = "" }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false)
   const copy = async () => {
@@ -231,6 +240,18 @@ export default function ApiPage() {
                 </div>
                 <p className="mt-2">For FH ONE, the Messages API&apos;s MCP connector takes the same URL and key.</p>
               </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-[#e8eaed] bg-[#f8fafc] px-4 py-3 text-[13.5px] leading-relaxed text-[#374151]">
+              <p className="font-semibold text-[#0d1117]">Things to ask Claude</p>
+              <ul className="mt-1.5 space-y-1.5">
+                {CLAUDE_QUESTIONS.map((q) => (
+                  <li key={q} className="flex items-center justify-between gap-3">
+                    <span className="min-w-0">&ldquo;{q}&rdquo;</span>
+                    <CopyButton text={q} label="Copy" className="shrink-0" />
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[13px] text-[#6b7280]">claude.ai reads the tool list when the connector is added. When new tools are added here, remove the connector and add it again once; changes inside a tool need nothing.</p>
             </div>
           </div>
         </div>
