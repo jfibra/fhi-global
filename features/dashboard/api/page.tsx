@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Check, Copy, ExternalLink, Eye, EyeOff, KeyRound, RefreshCw, Webhook } from "lucide-react"
+import { Check, Copy, ExternalLink, Eye, EyeOff, KeyRound, RefreshCw, Sparkles, Webhook } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { isAdminStaffRole } from "@/lib/app-roles"
@@ -200,6 +200,39 @@ export default function ApiPage() {
               <CopyButton text={apiKey} label="Copy key" />
             </div>
           ) : null}
+        </div>
+      </section>
+
+      {/* The same endpoints as tools for Claude (app/api/mcp, lib/mcp/server.ts). */}
+      <section className="rounded-2xl border border-[#e8eaed] bg-white px-5 py-4 shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)]">
+        <div className="flex items-start gap-3">
+          <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-[#b8913f]" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="font-['Outfit'] text-[16px] font-bold text-[#001f3f]">Connect to Claude (MCP)</p>
+            <p className="mt-1 text-[14px] text-[#374151]">
+              Every endpoint below is also a read-only tool Claude can call while you chat: sales, top sellers, sales summary, accounts, projects, developers, teams, events, merchants. The server is{" "}
+              <code className="rounded bg-[#f4f6f9] px-1.5 py-0.5 font-mono text-[12.5px]">{status?.site ?? base}/api/mcp</code> and it takes the same key.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className="rounded-xl border border-[#e8eaed] bg-[#f8fafc] px-4 py-3 text-[13.5px] leading-relaxed text-[#374151]">
+                <p className="font-semibold text-[#0d1117]">In claude.ai</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-5">
+                  <li>Customize → Connectors → Add → Add custom connector.</li>
+                  <li>Name: FHI Global. URL: <code className="font-mono text-[12.5px]">{status?.site ?? base}/api/mcp</code>.</li>
+                  <li>Authentication: no sign-in, and add a request header <code className="font-mono text-[12.5px]">Authorization</code> with the value <code className="font-mono text-[12.5px]">Bearer &lt;key&gt;</code>.</li>
+                  <li>Add, then ask Claude anything about FHI&apos;s data.</li>
+                </ol>
+              </div>
+              <div className="rounded-xl border border-[#e8eaed] bg-[#f8fafc] px-4 py-3 text-[13.5px] leading-relaxed text-[#374151]">
+                <p className="font-semibold text-[#0d1117]">In Claude Code</p>
+                <div className="mt-1 flex items-start gap-2 rounded-lg bg-[#0d1117] px-3 py-2">
+                  <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[12px] leading-relaxed text-[#e6edf3]">{`claude mcp add --transport http fhi ${status?.site ?? base}/api/mcp --header "Authorization: Bearer ${apiKey ?? "<key>"}"`}</pre>
+                  <CopyButton text={`claude mcp add --transport http fhi ${status?.site ?? base}/api/mcp --header "Authorization: Bearer ${apiKey ?? "<key>"}"`} label="Copy" />
+                </div>
+                <p className="mt-2">For FH ONE, the Messages API&apos;s MCP connector takes the same URL and key.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

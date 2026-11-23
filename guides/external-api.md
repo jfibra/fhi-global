@@ -401,6 +401,30 @@ Each row:
 
 `figures` and `recent_deals` come only with `include=deals`. `contact.account_id` is the merchant's FHI login, the same id the users route gives rentsouq.ae for auto-login. A closed deal is a **validated** Rental sale on FHI tagged with the merchant (`sales[].merchant` on the sales endpoint, `sales?merchant=M-4K7Q`); the QR opens `fhiglobal.ae/m/<code>`, which counts the scan and forwards to rentsouq.ae with `?ref=<code>`.
 
+## Connect Claude directly (MCP)
+
+Every endpoint above is also a tool Claude can call while someone chats with it, through FHI's MCP server at `https://fhiglobal.ae/api/mcp` (`app/api/mcp/route.ts`, `lib/mcp/server.ts`). It speaks MCP over Streamable HTTP, statelessly, and takes the **same key** as the API, sent as `Authorization: Bearer <key>`. Every tool is read-only: each one is a GET of the matching endpoint, run in-process with the caller's key, so the filters, the rules and the rate limit are exactly the API's. The tool descriptions are generated from `lib/api-catalog.ts`.
+
+| Tool | Endpoint |
+|---|---|
+| `fhi_sales` | `/api/external/sales` |
+| `fhi_top_sellers` | `/api/external/sales/top` |
+| `fhi_sales_summary` | `/api/external/sales/summary` |
+| `fhi_accounts` | `/api/external/agents` |
+| `fhi_projects` | `/api/external/projects` |
+| `fhi_developers` | `/api/external/developers` |
+| `fhi_teams` | `/api/external/teams` |
+| `fhi_events` | `/api/external/events` |
+| `fhi_merchants` | `/api/external/merchants` |
+
+Where to plug it in:
+
+- **claude.ai** — Customize → Connectors → Add → Add custom connector: name `FHI Global`, URL `https://fhiglobal.ae/api/mcp`, no sign-in, and a request header `Authorization` = `Bearer <key>`. On a Team or Enterprise plan the organisation owner adds it under Organization settings → Connectors and members click Connect.
+- **Claude Code** — `claude mcp add --transport http fhi https://fhiglobal.ae/api/mcp --header "Authorization: Bearer <key>"`, then `/mcp` shows it connected.
+- **FH ONE (Messages API)** — the MCP connector: `mcp_servers: [{ type: "url", url: "https://fhiglobal.ae/api/mcp", name: "fhi", authorization_token: "<key>" }]` plus `tools: [{ type: "mcp_toolset", mcp_server_name: "fhi" }]` with the beta header `mcp-client-2025-11-20`.
+
+Without the key the endpoint answers 401 with a `WWW-Authenticate` challenge; with no key configured on the server, 503. Anyone holding the key sees everything the key sees, so give it only to accounts that may read sales and client names.
+
 ## Joining them
 
 `sales[].agent.id` and `sales[].credits[].id` are `agents[].id`. `sales[].project.id` is `projects[].id`, and `projects[].developer.id`, `sales[].developer.id` are `developers[].id`. Email is the key to match a person across the other company sites.
