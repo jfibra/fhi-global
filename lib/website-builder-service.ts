@@ -451,7 +451,8 @@ export async function saveSite(
         theme: data.theme ?? {},
         // Picked reviews in order (migration 087); null = all approved, newest first.
         review_ids: Array.isArray(data.reviewIds) ? data.reviewIds : null,
-        is_published: true,
+        // is_published is left as it is: an admin can take a site down (Agent Resource →
+        // Agent Websites), and the agent's next save must not put it back up.
         updated_at: now,
       })
       .eq("id", websiteId)

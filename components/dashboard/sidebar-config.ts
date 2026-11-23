@@ -4,7 +4,7 @@ import {
   Briefcase, Landmark, ShoppingCart, Network, FolderOpen,
   Tag, TrendingUp, LifeBuoy, CreditCard, ClipboardList, KeyRound,
   Clapperboard, LayoutTemplate, QrCode, ScrollText, Inbox, CalendarDays, CalendarRange,
-  Wallet, MessagesSquare, FileText, UploadCloud, Stamp, Globe, FolderDown, Library, MonitorPlay,
+  Wallet, MessagesSquare, FileText, Stamp, Globe, FolderDown, Library, MonitorPlay,
   Mail, PanelsTopLeft, FileSignature, Star, Handshake, Presentation, Wand2, Sparkles, Link2, Database, UserPlus, Files, Eye, GitBranch, Link as LinkIcon, Webhook, Store,
 } from "lucide-react"
 import { API_PAGE_OWNERS } from "@/lib/api-catalog"
@@ -242,6 +242,8 @@ const ADMIN_NAV: RoleNavEntry[] = [
       { icon: Presentation, label: "Meeting Poster", to: "meeting-poster", description: "Event posters with your choice of speakers.", preview: "meeting-poster" },
       { ...BUSINESS_CARD,   description: "Your shareable digital business card.", preview: "business-card" },
       { ...DIGITAL_CARD,    description: "The one link you share — contacts, socials and QR.", preview: "digital-business-card" },
+      // Every agent's website: preview, take down / restore, delete for good (features/dashboard/agent-websites).
+      { icon: Globe, label: "Agent Websites", to: "agent-websites", description: "Every agent's website — preview, take down or delete.", preview: "agent-websites" },
     ],
   },
   {
@@ -274,12 +276,6 @@ const ADMIN_NAV: RoleNavEntry[] = [
   // The keyed external API's links and key, for the one account building the
   // group's AI chat against them (lib/api-catalog.ts API_PAGE_OWNERS).
   { icon: Webhook, label: "API", to: "api", onlyUsers: API_PAGE_OWNERS },
-  // Dev-only test bench for the upload-compression pipeline
-  // (lib/upload/compress-image.ts) — not a real business feature, just a way
-  // to throw arbitrary images at the exact same server-side compression every
-  // upload route runs. Admin staff only; safe to remove once that pipeline's
-  // behavior is no longer in question.
-  { icon: UploadCloud, label: "Upload Test", to: "upload-test" },
 ]
 
 /** Content-only role: developers + projects, no admin powers. */
