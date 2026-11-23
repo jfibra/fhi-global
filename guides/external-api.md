@@ -417,6 +417,8 @@ Every endpoint above is also a tool Claude can call while someone chats with it,
 | `fhi_events` | `/api/external/events` |
 | `fhi_merchants` | `/api/external/merchants` |
 
+And, since 2026-11-23, the admin FHI Assistant's read-only tools under the prefix `fhi_assistant_` — the same functions the admin chat runs, with their own names, descriptions and parameters (`lib/fhi-chat-tools.ts`): `website_traffic` (Google Analytics: visitors, sources, countries, devices, pages, the day-by-day trend, who is on the site now), `search_keywords` (Search Console), `leads_overview`, `sales_pipeline`, `support_tickets`, `company_purchases`, `agent_websites`, `listings_overview`, `clients_overview`, `agent_reviews`, `activity_log`, `activity_feed`, `member_lookup`, `owner_documents`, `teams_detail`, `event_engagement`, `event_attendees`, `events_overview`, `news_overview`, `data_health`, `platform_counts`, `new_accounts`, `recent_sales`, `agent_sales`, `agent_recruits`, `agent_network`, `developer_overview`, `projects_stats`, `project_details`, `find_projects`, `top_agents`, `top_developers`, `top_teams`, `sales_summary`, `upcoming_birthdays`. The tools that act — posters, business cards, emails — are never exposed. These answers include lead and client contact details, so the key is admin-level reading.
+
 Where to plug it in:
 
 - **claude.ai** — Customize → Connectors → Add → Add custom connector: name `FHI Global`, URL `https://fhiglobal.ae/api/mcp`, no sign-in, and a request header `Authorization` = `Bearer <key>`. On a Team or Enterprise plan the organisation owner adds it under Organization settings → Connectors and members click Connect.

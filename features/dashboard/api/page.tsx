@@ -210,7 +210,7 @@ export default function ApiPage() {
           <div className="min-w-0 flex-1">
             <p className="font-['Outfit'] text-[16px] font-bold text-[#001f3f]">Connect to Claude (MCP)</p>
             <p className="mt-1 text-[14px] text-[#374151]">
-              Every endpoint below is also a read-only tool Claude can call while you chat: sales, top sellers, sales summary, accounts, projects, developers, teams, events, merchants. The server is{" "}
+              Every endpoint below is a read-only tool Claude can call while you chat: sales, top sellers, sales summary, accounts, projects, developers, teams, events, merchants. So is everything the admin FHI Assistant can read: website traffic and search keywords from Google, leads, the pipeline, tickets, purchases, websites, listings, clients, reviews, the activity log, member lookup, owner documents, events, news, data health. The server is{" "}
               <code className="rounded bg-[#f4f6f9] px-1.5 py-0.5 font-mono text-[12.5px]">{status?.site ?? base}/api/mcp</code> and it takes the same key.
             </p>
             <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">

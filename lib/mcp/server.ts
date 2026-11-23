@@ -1,9 +1,11 @@
 import "server-only"
 
-import { McpServer } from "@modelcontextprotocol/server"
+import { McpServer, fromJsonSchema, type JsonSchemaType } from "@modelcontextprotocol/server"
 import { NextRequest } from "next/server"
 import { z } from "zod"
 import { API_ENDPOINTS, type ApiEndpoint } from "@/lib/api-catalog"
+import { requireExternalKey } from "@/lib/external-api"
+import { FHI_CHAT_TOOLS, runFhiChatTool } from "@/lib/fhi-chat-tools"
 import { SITE_URL } from "@/lib/seo"
 import { GET as salesGet } from "@/app/api/external/sales/route"
 import { GET as salesTopGet } from "@/app/api/external/sales/top/route"
@@ -16,14 +18,28 @@ import { GET as eventsGet } from "@/app/api/external/events/route"
 import { GET as merchantsGet } from "@/app/api/external/merchants/route"
 
 /**
- * FHI's MCP server (2026-11-23): the keyed external API as tools Claude can
- * call — in claude.ai (a custom connector), Claude Code, or FH ONE through
- * the Messages API's MCP connector. Read-only by construction: every tool
- * is one GET of app/api/external/*, invoked in-process with the caller's
- * own key, so the data, the filters and the rules are exactly the API's
- * (lib/api-catalog.ts is the one catalog; its text is the tools'
- * descriptions). A fresh server is built per request (stateless).
+ * FHI's MCP server (2026-11-23): tools Claude can call — in claude.ai (a
+ * custom connector), Claude Code, or FH ONE through the Messages API's MCP
+ * connector. Two sets, both read-only and both behind the external API key:
+ *
+ * - `fhi_*`: the keyed external API. Every tool is one GET of
+ *   app/api/external/*, invoked in-process with the caller's own key, so the
+ *   data, the filters and the rules are exactly the API's
+ *   (lib/api-catalog.ts is the one catalog; its text is the descriptions).
+ * - `fhi_assistant_*`: the admin FHI Assistant's read-only tools
+ *   (lib/fhi-chat-tools.ts FHI_CHAT_TOOLS minus the ones that draw posters
+ *   or send emails): website traffic and search keywords from Google, leads,
+ *   the sales pipeline, support tickets, purchases, agent websites, listings,
+ *   clients, reviews, the activity log, member lookup, owner documents,
+ *   events, news, data health, birthdays. The same functions the admin chat
+ *   runs, so the answers match it. Note these include lead and client
+ *   contact details: the key is admin-level reading.
+ *
+ * A fresh server is built per request (stateless).
  */
+
+/** Assistant tools that act (emails, posters, print cards) — never exposed. */
+const ASSISTANT_SKIP = new Set(["birthday_poster", "meeting_poster", "business_card", "print_business_card", "send_email", "congratulate_top_agents"])
 
 export const MCP_SERVER_NAME = "fhi-global"
 export const MCP_SERVER_VERSION = "1.0.0"
@@ -207,6 +223,19 @@ async function callEndpoint(handler: Handler, path: string, args: Record<string,
  * already checked by the route; it is forwarded to the endpoints so the
  * same key, rate limit and rules apply.
  */
+const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+
+const NO_KEY_TEXT =
+  "This connector has no FHI key. In its settings add a request header named Authorization with the value `Bearer <key>` (the key is on the FHI API page), or put ?key=<key> at the end of the server URL."
+
+/** The same key check the API runs (timing-safe compare, 503 when unset, the per-IP rate limit). */
+function keyDenied(authorization: string): string | null {
+  const probe = new NextRequest(new URL("/api/mcp", SITE_URL), { headers: authorization ? { authorization } : {} })
+  const denied = requireExternalKey(probe)
+  if (!denied) return null
+  return denied.status === 401 ? NO_KEY_TEXT : `FHI answered ${denied.status}.`
+}
+
 export function buildFhiMcpServer(authorization: string): McpServer {
   const server = new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION, title: "FHI Global" })
   for (const t of TOOLS) {
@@ -214,17 +243,33 @@ export function buildFhiMcpServer(authorization: string): McpServer {
     if (!e) continue
     server.registerTool(
       t.name,
-      {
-        title: `FHI · ${e.name}`,
-        description: describe(e),
-        inputSchema: t.schema,
-        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-      },
+      { title: `FHI · ${e.name}`, description: describe(e), inputSchema: t.schema, annotations: READ_ONLY },
       async (args) => callEndpoint(t.handler, e.path, args as Record<string, unknown>, authorization),
+    )
+  }
+  // The admin FHI Assistant's read-only tools, as they are (its OpenAI
+  // definitions carry the names, descriptions and JSON schemas).
+  for (const t of FHI_CHAT_TOOLS) {
+    const f = t.function
+    if (ASSISTANT_SKIP.has(f.name)) continue
+    server.registerTool(
+      `fhi_assistant_${f.name}`,
+      {
+        title: `FHI Assistant · ${f.name.replace(/_/g, " ")}`,
+        description: `${f.description} Dates are YYYY-MM-DD (to_date exclusive). Answers as the admin FHI Assistant's tool of the same name.`,
+        inputSchema: fromJsonSchema(f.parameters as JsonSchemaType),
+        annotations: READ_ONLY,
+      },
+      async (args) => {
+        const denied = keyDenied(authorization)
+        if (denied) return { content: [{ type: "text" as const, text: denied }], isError: true }
+        const r = await runFhiChatTool(f.name, (args ?? {}) as Record<string, unknown>)
+        return { content: [{ type: "text" as const, text: r.forModel }], isError: r.forModel.startsWith('{"error"') }
+      },
     )
   }
   return server
 }
 
 /** What the API page and the guide print: how to connect. */
-export const MCP_TOOL_NAMES = TOOLS.map((t) => t.name)
+export const MCP_TOOL_NAMES = [...TOOLS.map((t) => t.name), ...FHI_CHAT_TOOLS.filter((t) => !ASSISTANT_SKIP.has(t.function.name)).map((t) => `fhi_assistant_${t.function.name}`)]
