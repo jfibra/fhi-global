@@ -19,8 +19,8 @@ import { useEffect, useRef, useState } from "react"
 import type { PointerEvent as ReactPointerEvent } from "react"
 import type { Conversion } from "mediabunny"
 import {
-  Check, ChevronLeft, ChevronRight, Download, GalleryHorizontal, ImagePlus, LayoutGrid, Loader2,
-  Pause, Play, Trash2, Volume2, VolumeX, X,
+  ArrowLeftRight, Check, ChevronLeft, ChevronRight, Download, GalleryHorizontal, ImagePlus, LayoutGrid, Loader2,
+  Music, Pause, Play, Trash2, Volume2, VolumeX, X,
 } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { ROLES_AD_BRANDING, resolveAppRoleOrMember } from "@/lib/app-roles"
@@ -48,17 +48,23 @@ type Logo = {
   light?: boolean
 }
 
-const PRESET_LOGOS = [
-  { src: "/logos/FHI_Branding Set_PNG Copies-02.png", name: "FHI Global (dark)" },
-  { src: "/logos/FHI_Branding_White.png", name: "FHI Global (light)", dark: true },
+// `pair`: the light and dark versions of one brand — only one of a pair can be on the picture;
+// picking the other swaps it in place.
+const PRESET_LOGOS: { src: string; name: string; dark?: boolean; pair?: string }[] = [
+  { src: "/logos/FHI_Branding Set_PNG Copies-02.png", name: "FHI Global (dark)", pair: "fhi" },
+  { src: "/logos/FHI_Branding_White.png", name: "FHI Global (light)", dark: true, pair: "fhi" },
   { src: "/logos/global_partner.png", name: "Global Partners" },
-  { src: "/logos/ad-branding/filipinohomes-dark.png", name: "Filipinohomes (dark)" },
-  { src: "/logos/ad-branding/filipinohomes-light.png", name: "Filipinohomes (light)", dark: true },
+  { src: "/logos/ad-branding/filipinohomes-dark.png", name: "Filipinohomes (dark)", pair: "filipinohomes" },
+  { src: "/logos/ad-branding/filipinohomes-light.png", name: "Filipinohomes (light)", dark: true, pair: "filipinohomes" },
   { src: "/logos/ad-branding/rent-ph.png", name: "Rent.ph" },
-  { src: "/logos/ad-branding/homes-ph.png", name: "Homes.ph" },
-  { src: "/logos/ad-branding/homes-ph-light.png", name: "Homes.ph (light)", dark: true },
+  { src: "/logos/ad-branding/homes-ph.png", name: "Homes.ph", pair: "homesph" },
+  { src: "/logos/ad-branding/homes-ph-light.png", name: "Homes.ph (light)", dark: true, pair: "homesph" },
   { src: "/logos/ad-branding/rentsouq-ae.png", name: "Rentsouq.ae" },
 ]
+
+/** The other version (light ↔ dark) of a preset logo that is on the picture, if any. */
+const pairedOnMedia = <L extends { key: string }>(p: (typeof PRESET_LOGOS)[number], logos: L[]): L | undefined =>
+  p.pair ? logos.find((l) => l.key !== p.src && PRESET_LOGOS.some((q) => q.src === l.key && q.pair === p.pair)) : undefined
 
 /** The company's ad permit line — fixed, not editable — drawn as white text with a dark outline. */
 const PERMIT_TEXT = "FHI Global Ad Permit No. 145225"
@@ -113,12 +119,156 @@ const ZOOM_MAX = 4
 // whole picture shows without scrolling the page. A video also has its player bar.
 const FIT_OFFSET = 150
 const PLAYER_BAR = 44
+// The jingle bar under the player (when a jingle is chosen).
+const JINGLE_BAR = 58
+// The shortest part of a jingle that can be chosen (seconds).
+const MIN_JINGLE_PART = 1
 
 const MARGIN = 0.04 // of the picture's width, for the quick positions
 // iOS Safari refuses canvases over ~16.7 MP; bigger photos are scaled down to fit on download.
 const MAX_PIXELS = 16_000_000
 // A video smaller than this (short side) is saved at it, so the logos stay sharp.
 const MIN_VIDEO_SHORT_SIDE = 1080
+
+// The brand jingles — the same tracks as the Reels Maker (public/reelssounds).
+// A jingle can only be used when one of its brand's logos is on the video (`logos` = preset
+// logo files); Rent.ph and Rentsouq.ae share the Rent.ph jingle, as in the Reels Maker.
+const JINGLES = [
+  { src: "/reelssounds/filipinohomes-jingle.mp3", name: "Filipino Homes", brand: "Filipinohomes", logos: ["/logos/ad-branding/filipinohomes-dark.png", "/logos/ad-branding/filipinohomes-light.png"] },
+  { src: "/reelssounds/homes-ph-jingle.mp3", name: "Homes.ph", brand: "Homes.ph", logos: ["/logos/ad-branding/homes-ph.png", "/logos/ad-branding/homes-ph-light.png"] },
+  { src: "/reelssounds/rent-ph-jingle.mp3", name: "Rent.ph", brand: "Rent.ph or Rentsouq.ae", logos: ["/logos/ad-branding/rent-ph.png", "/logos/ad-branding/rentsouq-ae.png"] },
+  { src: "/reelssounds/global-partners.mp3", name: "Global Partners", brand: "Global Partners", logos: ["/logos/global_partner.png"] },
+  { src: "/reelssounds/global-partners-instrumental.mp3", name: "FHI", brand: "FHI Global", logos: ["/logos/FHI_Branding Set_PNG Copies-02.png", "/logos/FHI_Branding_White.png"] },
+]
+
+/** Whether a jingle's brand logo is on the picture. */
+const jingleAllowed = (src: string, logos: { key: string }[]) =>
+  !!JINGLES.find((j) => j.src === src)?.logos.some((k) => logos.some((l) => l.key === k))
+const DEFAULT_JINGLE_VOLUME = 70
+// How long the jingle fades in at the start and out at the end (seconds).
+const DEFAULT_EASE_IN = 0
+const DEFAULT_EASE_OUT = 3
+
+/** The part of the jingle that plays (start–end, seconds; it repeats if the video is longer) and its eases. */
+type JingleShape = { start: number; end: number; easeIn: number; easeOut: number }
+
+/** Where in the jingle the video's moment `t` falls: the chosen part from its start, repeating. */
+function jingleTimeAt(t: number, { start, end }: Pick<JingleShape, "start" | "end">) {
+  const part = Math.max(MIN_JINGLE_PART, end - start)
+  return start + (Math.max(0, t) % part)
+}
+
+/** The jingle's volume (0–1) at a moment of the video: its volume, faded in at the start and out at the end. */
+function jingleGainAt(t: number, duration: number, volume: number, { easeIn, easeOut }: JingleShape) {
+  const g = clamp(volume, 0, 100) / 100
+  const fadeIn = easeIn > 0 ? clamp(t / easeIn, 0, 1) : 1
+  const fadeOut = easeOut > 0 && duration > 0 ? clamp((duration - t) / easeOut, 0, 1) : 1
+  return g * Math.min(fadeIn, fadeOut)
+}
+
+/**
+ * The saved video's sound, mixed here (OfflineAudioContext): the video's own
+ * sound when kept, plus the jingle from the chosen point, looped to the
+ * video's length at its volume, eased in at the start and out at the end.
+ * Returns one stereo AudioBuffer.
+ */
+async function mixSound(
+  mb: typeof import("mediabunny"),
+  own: import("mediabunny").InputAudioTrack | null,
+  jingleSrc: string,
+  jingleVolume: number,
+  duration: number,
+  shape: JingleShape,
+): Promise<AudioBuffer> {
+  const rate = own?.sampleRate || 48_000
+  const length = Math.max(1, Math.ceil(duration * rate))
+  const ctx = new OfflineAudioContext(2, length, rate)
+  // A limiter on the mix, so the video's sound plus the jingle never clips (crackles).
+  const limiter = ctx.createDynamicsCompressor()
+  limiter.threshold.value = -3
+  limiter.knee.value = 3
+  limiter.ratio.value = 20
+  limiter.attack.value = 0.003
+  limiter.release.value = 0.2
+  limiter.connect(ctx.destination)
+
+  if (own) {
+    // The video's own sound, laid out sample by sample at its timestamps.
+    const left = new Float32Array(length)
+    const right = new Float32Array(length)
+    const sink = new mb.AudioBufferSink(own)
+    for await (const { buffer, timestamp } of sink.buffers(0, duration)) {
+      const at = Math.max(0, Math.round(timestamp * rate))
+      if (at >= length) break
+      const n = Math.min(buffer.length, length - at)
+      const l = buffer.getChannelData(0)
+      const r = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : l
+      left.set(l.subarray(0, n), at)
+      right.set(r.subarray(0, n), at)
+    }
+    const ownBuffer = ctx.createBuffer(2, length, rate)
+    ownBuffer.copyToChannel(left, 0)
+    ownBuffer.copyToChannel(right, 1)
+    const node = ctx.createBufferSource()
+    node.buffer = ownBuffer
+    node.connect(limiter)
+    node.start(0)
+  }
+
+  const res = await fetch(jingleSrc)
+  if (!res.ok) throw new Error("Couldn't load the jingle.")
+  const jingle = await ctx.decodeAudioData(await res.arrayBuffer())
+  const node = ctx.createBufferSource()
+  node.buffer = jingle
+  // Play the chosen part, repeating it if the video is longer.
+  const partStart = clamp(shape.start, 0, Math.max(0, jingle.duration - MIN_JINGLE_PART))
+  const partEnd = clamp(shape.end, partStart + MIN_JINGLE_PART, jingle.duration)
+  node.loop = true
+  node.loopStart = partStart
+  node.loopEnd = partEnd
+  const gain = ctx.createGain()
+  const g = clamp(jingleVolume, 0, 100) / 100
+  // Same curve as the preview (jingleGainAt): a straight ramp in, a straight ramp out;
+  // on a video shorter than both eases together, they meet where they cross.
+  const easeIn = Math.min(shape.easeIn, duration)
+  const easeOut = Math.min(shape.easeOut, duration)
+  const meet = easeIn > 0 && easeOut > 0 ? (duration * easeIn) / (easeIn + easeOut) : null
+  const top = meet !== null && easeIn + easeOut > duration ? jingleGainAt(meet, duration, jingleVolume, shape) : g
+  if (easeIn > 0) {
+    gain.gain.setValueAtTime(0, 0)
+    gain.gain.linearRampToValueAtTime(top, easeIn + easeOut > duration && meet !== null ? meet : easeIn)
+  } else {
+    gain.gain.setValueAtTime(g, 0)
+  }
+  if (easeOut > 0) {
+    const from = Math.max(easeIn + easeOut > duration && meet !== null ? meet : easeIn, duration - easeOut)
+    gain.gain.setValueAtTime(top, from)
+    gain.gain.linearRampToValueAtTime(0, duration)
+  }
+  node.connect(gain).connect(limiter)
+  node.start(0, partStart)
+  node.stop(duration)
+  const out = await ctx.startRendering()
+  // Then a hard ceiling: if the loudest moment is above -1 dB, the whole mix is turned down to
+  // it — the limiter alone lets a few peaks through, and the AAC encoder would clip those.
+  const ceiling = 10 ** (-1 / 20)
+  let peak = 0
+  for (let c = 0; c < out.numberOfChannels; c++) {
+    const d = out.getChannelData(c)
+    for (let i = 0; i < d.length; i++) {
+      const v = Math.abs(d[i])
+      if (v > peak) peak = v
+    }
+  }
+  if (peak > ceiling) {
+    const k = ceiling / peak
+    for (let c = 0; c < out.numberOfChannels; c++) {
+      const d = out.getChannelData(c)
+      for (let i = 0; i < d.length; i++) d[i] *= k
+    }
+  }
+  return out
+}
 
 // Dragging within this many screen pixels of a centre line snaps onto it.
 const SNAP_PX = 6
@@ -319,13 +469,28 @@ export default function AdBrandingPage() {
   const [error, setError] = useState<string | null>(null)
   // The video preview's player bar.
   const [playing, setPlaying] = useState(false)
-  const [muted, setMuted] = useState(true)
+  // The preview plays with sound (see onLoadedMetadata for browsers that refuse that).
+  const [muted, setMuted] = useState(false)
+  // The saved video's sound: keep the video's own sound or remove it, and an optional jingle.
+  const [keepSound, setKeepSound] = useState(true)
+  const [jingle, setJingle] = useState<string | null>(null)
+  const [jingleVolume, setJingleVolume] = useState(DEFAULT_JINGLE_VOLUME)
+  // Where in the jingle the video starts, and its ease in / out (seconds).
+  const [jingleStart, setJingleStart] = useState(0)
+  // End of the chosen part; null = the end of the jingle.
+  const [jingleEnd, setJingleEnd] = useState<number | null>(null)
+  // Not adjustable: the jingle starts at full volume and fades out over the video's last 3 s.
+  const easeIn = DEFAULT_EASE_IN
+  const easeOut = DEFAULT_EASE_OUT
+  const [jingleLength, setJingleLength] = useState(0)
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(0)
 
   const stageRef = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const jingleRef = useRef<HTMLAudioElement>(null)
+  const lastVideoTime = useRef(0)
   const logoStrip = useRef<HTMLDivElement>(null)
   const drag = useRef<Drag | null>(null)
   const conversion = useRef<Conversion | null>(null)
@@ -361,7 +526,60 @@ export default function AdBrandingPage() {
     return () => window.removeEventListener("keydown", onKey)
   })
 
+  // While the video plays, follow its time every frame (the browser's timeupdate is only ~4×/s),
+  // so the player bar and the jingle bar's playhead move smoothly.
+  useEffect(() => {
+    if (!playing) return
+    let raf = 0
+    const step = () => {
+      const v = videoRef.current
+      if (v) setTime(v.currentTime)
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [playing])
+
+  // The jingle plays along with the preview: same play/pause, from the chosen point, the
+  // preview's mute — and its volume follows the ease in / out like the saved video (every 50 ms).
+  useEffect(() => {
+    const a = jingleRef.current
+    const v = videoRef.current
+    if (!a) return
+    const shape = { start: jingleStart, end: jingleEnd ?? (a.duration || Infinity), easeIn, easeOut }
+    const tick = () => {
+      if (!v) return
+      a.volume = jingleGainAt(v.currentTime, v.duration || 0, jingleVolume, shape)
+      // Back to the part's start when it reaches its end (the saved video repeats it the same way).
+      if (a.duration && a.currentTime >= Math.min(shape.end, a.duration) - 0.03) a.currentTime = shape.start
+    }
+    a.muted = muted
+    if (!(jingle && v && !v.paused)) {
+      a.pause()
+      if (v && a.duration) a.currentTime = jingleTimeAt(v.currentTime, { start: jingleStart, end: jingleEnd ?? a.duration })
+      return
+    }
+    tick()
+    if (a.duration) a.currentTime = jingleTimeAt(v.currentTime, { start: jingleStart, end: jingleEnd ?? a.duration })
+    void a.play().catch(() => undefined)
+    const timer = window.setInterval(tick, 50)
+    return () => window.clearInterval(timer)
+  }, [jingle, jingleVolume, muted, playing, jingleStart, jingleEnd, easeIn, easeOut])
+
   if (!allowed) return null
+
+  /** The saved video's sound — one choice: the video's own ("original", the default), none at
+   *  all, or a jingle (which replaces the video's own sound). */
+  const pickSound = (choice: "original" | "none" | string) => {
+    const src = choice === "original" || choice === "none" ? null : choice
+    setKeepSound(choice === "original")
+    if (src !== jingle) {
+      setJingleStart(0)
+      setJingleEnd(null)
+      setJingleLength(0)
+    }
+    setJingle(src)
+  }
 
   const isVideo = media?.kind === "video"
   const noun = isVideo ? "video" : "photo"
@@ -432,6 +650,8 @@ export default function AdBrandingPage() {
   function removeLogo(id: string) {
     setLogos((ls) => ls.filter((l) => l.id !== id))
     setSelected((s) => (s === id ? null : s))
+    // The jingle goes with its brand: removing the last matching logo puts the sound back to Original.
+    if (jingle && !jingleAllowed(jingle, logos.filter((l) => l.id !== id))) pickSound("original")
   }
 
   const update = (id: string, patch: Partial<Logo>) => setLogos((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
@@ -444,6 +664,20 @@ export default function AdBrandingPage() {
   const addPreset = (p: (typeof PRESET_LOGOS)[number]) => {
     if (isOnMedia(p.src)) return
     const light = !!p.dark
+    const other = pairedOnMedia(p, logos)
+    if (other) {
+      // Swap light ↔ dark in place: same position, width and outline.
+      const outline = other.outline ?? DEFAULT_OUTLINE
+      outlineImage(p.src, light, outline)
+        .then(async (src) => {
+          const img = await loadImage(src)
+          const aspect = img.naturalWidth / Math.max(1, img.naturalHeight)
+          setLogos((ls) => ls.map((l) => (l.id === other.id ? { ...l, key: p.src, src, name: p.name, base: p.src, light, aspect, outline } : l)))
+          setSelected(other.id)
+        })
+        .catch(() => setError(`Could not read ${p.name}.`))
+      return
+    }
     outlineImage(p.src, light, DEFAULT_OUTLINE)
       .then((src) => addLogo(p.src, src, p.name, 0.25, { outline: DEFAULT_OUTLINE, base: p.src, light }))
       .catch(() => setError(`Could not read ${p.name}.`))
@@ -585,11 +819,24 @@ export default function AdBrandingPage() {
     const input = new mb.Input({ source: new mb.BlobSource(m.file), formats: mb.ALL_FORMATS })
     try {
       const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target: new mb.BufferTarget() })
+      // Sound: the video's own (copied as it is), none, or our own mix with a jingle — then the
+      // conversion only does the picture and we add the mixed track to the output ourselves.
+      const mixing = !!jingle
+      let mixed: AudioBuffer | null = null
+      if (mixing) {
+        const videoTrack = await input.getPrimaryVideoTrack()
+        const ownTrack = keepSound ? await input.getPrimaryAudioTrack() : null
+        const duration = videoTrack ? await videoTrack.computeDuration() : await input.computeDuration()
+        const ownDecodable = ownTrack ? await ownTrack.canDecode().catch(() => false) : false
+        mixed = await mixSound(mb, ownDecodable ? ownTrack : null, jingle, jingleVolume, duration, { start: jingleStart, end: jingleEnd ?? Infinity, easeIn, easeOut })
+      }
       const conv = await mb.Conversion.init({
         input,
         output,
         tracks: "primary",
         showWarnings: false,
+        composable: mixing,
+        audio: mixing || !keepSound ? { discard: true } : undefined,
         video: async (track) => ({
           ...(await originalSettings(mb, track, W, H, SW * SH)),
           width: SW,
@@ -619,13 +866,34 @@ export default function AdBrandingPage() {
         throw new Error("This browser can't edit that video. Try Chrome or Safari, or save the video as MP4 first.")
       }
       const lostSound = conv.discardedTracks.some((d) => d.track.isAudioTrack() && d.reason !== "discarded_by_user")
+      let sound: InstanceType<typeof mb.AudioBufferSource> | null = null
+      if (mixing && mixed) {
+        const codec = await mb.getFirstEncodableAudioCodec(["aac", "opus"], { numberOfChannels: 2, sampleRate: mixed.sampleRate })
+        if (!codec) throw new Error("This browser can't save sound in a video. Try Chrome or Safari.")
+        sound = new mb.AudioBufferSource({ codec, bitrate: 192_000 })
+        output.addAudioTrack(sound)
+        await output.start()
+      }
       conversion.current = conv
       conv.onProgress = (p) => setProgress(p)
-      await conv.execute()
+      try {
+        await Promise.all([
+          conv.execute(),
+          (async () => {
+            if (!sound || !mixed) return
+            await sound.add(mixed)
+            sound.close()
+          })(),
+        ])
+        if (mixing) await output.finalize()
+      } catch (e) {
+        if (mixing) await output.cancel().catch(() => undefined)
+        throw e
+      }
       const buffer = (output.target as InstanceType<typeof mb.BufferTarget>).buffer
       if (!buffer) throw new Error("Your browser couldn't save the video.")
       saveBlob(new Blob([buffer], { type: "video/mp4" }), `${m.name}-branded.mp4`)
-      if (lostSound) setNotice("Saved without sound — this browser can't read the video's audio.")
+      if (lostSound && keepSound && !mixing) setNotice("Saved without sound — this browser can't read the video's audio.")
     } catch (e) {
       if (e instanceof mb.ConversionCanceledError) return
       throw e
@@ -656,12 +924,14 @@ export default function AdBrandingPage() {
   const sel = logos.find((l) => l.id === selected) ?? null
   const label = "mb-2 text-sm font-bold text-[#0d1117]"
   const ratio = media ? media.w / media.h : 1
-  const fitOffset = FIT_OFFSET + (isVideo ? PLAYER_BAR : 0)
+  const fitOffset = FIT_OFFSET + (isVideo ? PLAYER_BAR : 0) + (isVideo && jingle ? JINGLE_BAR : 0)
   const fitWidth = `min(100cqw, (100dvh - ${fitOffset}px) * ${ratio})`
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <input ref={fileInput} type="file" accept="image/*,video/*" className="hidden" onChange={(e) => { void pickFile(e.target.files?.[0]); e.target.value = "" }} />
+      {/* The chosen jingle, played along with the video preview. */}
+      <audio ref={jingleRef} src={jingle ?? undefined} loop preload="auto" className="hidden" onLoadedMetadata={(e) => setJingleLength(e.currentTarget.duration || 0)} />
 
       {error && (
         <p className="flex items-center justify-between gap-2 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -700,14 +970,53 @@ export default function AdBrandingPage() {
                   ref={videoRef}
                   src={media.url}
                   className="absolute inset-0 h-full w-full bg-black"
-                  autoPlay
                   loop
                   playsInline
-                  muted={muted}
-                  onPlay={() => setPlaying(true)}
-                  onPause={() => setPlaying(false)}
-                  onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
-                  onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+                  muted={muted || !keepSound}
+                  onPlay={(e) => {
+                    setPlaying(true)
+                    const a = jingleRef.current
+                    if (a && jingle) {
+                      if (a.duration) a.currentTime = jingleTimeAt(e.currentTarget.currentTime, { start: jingleStart, end: jingleEnd ?? a.duration })
+                      void a.play().catch(() => undefined)
+                    }
+                  }}
+                  onPause={() => {
+                    setPlaying(false)
+                    jingleRef.current?.pause()
+                  }}
+                  onTimeUpdate={(e) => {
+                    const t = e.currentTarget.currentTime
+                    setTime(t)
+                    // The jingle plays straight through like in the saved video; it is only put back
+                    // in step when the video loops to the start or drifts clearly (> 1 s) away —
+                    // correcting small drifts every tick made it skip.
+                    const a = jingleRef.current
+                    if (a && jingle && a.duration) {
+                      const looped = t < lastVideoTime.current - 0.5
+                      const want = jingleTimeAt(t, { start: jingleStart, end: jingleEnd ?? a.duration })
+                      if (looped || Math.abs(a.currentTime - want) > 1) a.currentTime = want
+                    }
+                    lastVideoTime.current = t
+                  }}
+                  onSeeked={(e) => {
+                    // After a scrub, start the jingle from the same point the saved video would.
+                    const a = jingleRef.current
+                    const t = e.currentTarget.currentTime
+                    lastVideoTime.current = t
+                    if (a && jingle && a.duration) a.currentTime = jingleTimeAt(t, { start: jingleStart, end: jingleEnd ?? a.duration })
+                  }}
+                  onLoadedMetadata={(e) => {
+                    setDuration(e.currentTarget.duration)
+                    // Start playing with sound; a browser that blocks sound until you click
+                    // (Safari, some Chrome cases) starts it muted instead — the speaker turns it on.
+                    const v = e.currentTarget
+                    v.play().catch(() => {
+                      v.muted = true
+                      setMuted(true)
+                      void v.play().catch(() => undefined)
+                    })
+                  }}
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -775,6 +1084,41 @@ export default function AdBrandingPage() {
                   {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 </button>
               </div>
+            )}
+            {media.kind === "video" && jingle && jingleLength > 0 && (
+              <JingleRange
+                name={JINGLES.find((j) => j.src === jingle)?.name ?? "Jingle"}
+                volume={jingleVolume}
+                onVolume={setJingleVolume}
+                length={jingleLength}
+                start={jingleStart}
+                end={jingleEnd ?? jingleLength}
+                playhead={jingleTimeAt(time, { start: jingleStart, end: jingleEnd ?? jingleLength })}
+                onChange={(s, e) => {
+                  setJingleStart(s)
+                  setJingleEnd(e >= jingleLength - 0.05 ? null : e)
+                }}
+                onSeek={(p) => {
+                  // The video moves to the moment that plays this point of the jingle, in the
+                  // current repeat of the chosen part (the first one if that would pass the end).
+                  const v = videoRef.current
+                  if (!v) return
+                  const s = jingleStart
+                  const part = Math.max(MIN_JINGLE_PART, (jingleEnd ?? jingleLength) - s)
+                  const offset = clamp(p - s, 0, part)
+                  const round = Math.floor(v.currentTime / part)
+                  let t = round * part + offset
+                  if (t > (v.duration || 0)) t = offset
+                  seek(clamp(t, 0, v.duration || 0))
+                }}
+                onStartSet={() => {
+                  // Replay from the video's start, so the new jingle start can be heard in sync.
+                  const v = videoRef.current
+                  if (!v) return
+                  v.currentTime = 0
+                  void v.play().catch(() => undefined)
+                }}
+              />
             )}
             </>
           ) : (
@@ -859,13 +1203,14 @@ export default function AdBrandingPage() {
             >
               {PRESET_LOGOS.map((p) => {
                 const added = isOnMedia(p.src)
+                const swaps = !added && !!pairedOnMedia(p, logos)
                 return (
                   <button
                     key={p.src}
                     type="button"
                     disabled={!media || added || busy}
                     onClick={() => addPreset(p)}
-                    title={added ? `${p.name} — already on the ${noun}` : p.name}
+                    title={added ? `${p.name} — already on the ${noun}` : swaps ? `Swap to ${p.name}` : p.name}
                     className={`relative flex h-14 items-center justify-center border border-[#e5e8ec] p-1.5 transition-colors hover:border-[#001f3f] disabled:cursor-not-allowed disabled:opacity-40 ${p.dark ? "bg-[#001f3f]" : "bg-white"}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -873,6 +1218,11 @@ export default function AdBrandingPage() {
                     {added && (
                       <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center bg-[#d6b357]">
                         <Check className="h-3 w-3 text-[#001f3f]" />
+                      </span>
+                    )}
+                    {swaps && (
+                      <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center border border-[#d6b357] bg-white" aria-hidden>
+                        <ArrowLeftRight className="h-3 w-3 text-[#001f3f]" />
                       </span>
                     )}
                   </button>
@@ -956,6 +1306,38 @@ export default function AdBrandingPage() {
             </div>
           )}
 
+          {isVideo && (
+            <div className="space-y-3">
+              <div>
+                {/* One choice for the saved video's sound: the video's own (default), none, or a jingle. */}
+                <p className="mb-2 text-sm font-bold text-[#0d1117]">Video sound</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([
+                    { id: "original", name: "Original", Icon: Volume2, on: keepSound && !jingle, pick: () => pickSound("original") },
+                    { id: "none", name: "None", Icon: VolumeX, on: !keepSound && !jingle, pick: () => pickSound("none") },
+                    ...JINGLES.map((j) => ({
+                      id: j.src, name: j.name, Icon: Music, on: jingle === j.src, pick: () => pickSound(j.src),
+                      locked: !jingleAllowed(j.src, logos), hint: `Add the ${j.brand} logo to use this jingle`,
+                    })),
+                  ] as { id: string; name: string; Icon: typeof Music; on: boolean; pick: () => void; locked?: boolean; hint?: string }[]).map(({ id, name, Icon, on, pick, locked, hint }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      disabled={busy || locked}
+                      onClick={pick}
+                      aria-pressed={on}
+                      title={locked ? hint : undefined}
+                      className={`flex h-9 items-center gap-1.5 border px-2 text-left text-xs font-semibold disabled:opacity-40 ${on ? "border-[#001f3f] bg-[#001f3f] text-white" : "border-[#e5e8ec] text-[#374151] hover:border-[#001f3f]"}`}
+                    >
+                      <Icon className={`h-3.5 w-3.5 shrink-0 ${on ? "text-[#d6b357]" : "text-[#9ca3af]"}`} />
+                      <span className="truncate">{name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2 border-t border-[#e5e8ec] pt-4">
             {progress !== null ? (
               <div className="space-y-2">
@@ -985,13 +1367,159 @@ export default function AdBrandingPage() {
   )
 }
 
-function Slider({ label, value, min, max, unit, onChange }: { label: string; value: number; min: number; max: number; unit: string; onChange: (v: number) => void }) {
+/**
+ * The jingle under the video's player: its whole length as a bar, with the part
+ * that plays between two handles — drag either (or use the arrow keys on it).
+ */
+function JingleRange({ name, volume, onVolume, length, start, end, playhead, onChange, onStartSet, onSeek }: {
+  name: string
+  /** The jingle's volume, 0–100. */
+  volume: number
+  onVolume: (v: number) => void
+  length: number
+  start: number
+  end: number
+  /** Where in the jingle the video is right now (moves with the video). */
+  playhead: number
+  onChange: (start: number, end: number) => void
+  /** The start handle was let go (or moved with a key) — the page replays the video from 0:00. */
+  onStartSet: () => void
+  /** The playhead was dragged (or the bar clicked) to this point of the jingle — the page moves the video to match. */
+  onSeek: (jingleTime: number) => void
+}) {
+  const track = useRef<HTMLDivElement>(null)
+  const dragging = useRef<"start" | "end" | "playhead" | null>(null)
+  const pct = (v: number) => `${(clamp(v, 0, length) / length) * 100}%`
+  const set = (which: "start" | "end", v: number) => {
+    if (which === "start") onChange(clamp(v, 0, end - MIN_JINGLE_PART), end)
+    else onChange(start, clamp(v, start + MIN_JINGLE_PART, length))
+  }
+  const fromPointer = (clientX: number) => {
+    const r = track.current?.getBoundingClientRect()
+    return r ? (clamp(clientX - r.left, 0, r.width) / r.width) * length : 0
+  }
+  const handle = (which: "start" | "end") => (
+    <span
+      role="slider"
+      tabIndex={0}
+      aria-label={which === "start" ? "Jingle start" : "Jingle end"}
+      aria-valuemin={0}
+      aria-valuemax={Math.round(length)}
+      aria-valuenow={Math.round(which === "start" ? start : end)}
+      aria-valuetext={clock(which === "start" ? start : end)}
+      onPointerDown={(e) => {
+        e.preventDefault()
+        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+        dragging.current = which
+      }}
+      onPointerMove={(e) => { if (dragging.current === which) set(which, fromPointer(e.clientX)) }}
+      onPointerUp={() => {
+        if (dragging.current === "start") onStartSet()
+        dragging.current = null
+      }}
+      onPointerCancel={() => { dragging.current = null }}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 5 : 1
+        const d = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -step : e.key === "ArrowRight" || e.key === "ArrowUp" ? step : 0
+        if (!d) return
+        e.preventDefault()
+        set(which, (which === "start" ? start : end) + d)
+        if (which === "start") onStartSet()
+      }}
+      className="absolute top-1/2 z-10 h-6 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize touch-none rounded-sm border-2 border-white bg-[#d6b357] shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-[#001f3f]"
+      style={{ left: pct(which === "start" ? start : end) }}
+    />
+  )
+  return (
+    <div className="mt-2 border border-[#e5e8ec] bg-white px-2 py-1.5">
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="flex min-w-0 items-center gap-1.5 font-bold text-[#0d1117]">
+          <Music className="h-3.5 w-3.5 shrink-0 text-[#d6b357]" />
+          <span className="truncate">{name}</span>
+        </span>
+        <label className="ml-3 mr-auto flex min-w-0 items-center gap-1.5 text-[#6b7280]" title="Jingle volume">
+          {volume === 0 ? <VolumeX className="h-3.5 w-3.5 shrink-0 text-[#001f3f]" /> : <Volume2 className="h-3.5 w-3.5 shrink-0 text-[#001f3f]" />}
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={volume}
+            onChange={(e) => onVolume(Number(e.target.value))}
+            aria-label="Jingle volume"
+            className="w-24 min-w-0 accent-[#001f3f]"
+          />
+          <span className="w-8 shrink-0 tabular-nums">{volume}%</span>
+        </label>
+        <span className="shrink-0 tabular-nums text-[#6b7280]">
+          <span className="font-semibold text-[#0d1117]">{clock(clamp(playhead, start, end))}</span> · {clock(start)} – {clock(end)}
+        </span>
+      </div>
+      <div className="px-1.5">
+        <div ref={track} className="relative h-6 select-none">
+          <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-[#e5e8ec]" />
+          <div className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-[#001f3f]" style={{ left: pct(start), width: `calc(${pct(end)} - ${pct(start)})` }} />
+          {/* What has played of the part so far, and the playhead — in step with the video's bar. */}
+          <div className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-[#d6b357]" style={{ left: pct(start), width: `calc(${pct(clamp(playhead, start, end))} - ${pct(start)})` }} />
+          {/* Clicking the chosen part moves the playhead (and the video) there. */}
+          <div
+            className="absolute inset-y-0 cursor-pointer"
+            style={{ left: pct(start), width: `calc(${pct(end)} - ${pct(start)})` }}
+            onPointerDown={(e) => onSeek(clamp(fromPointer(e.clientX), start, end))}
+          />
+          {/* The playhead — drag it to move through the jingle; the video follows. */}
+          <span
+            role="slider"
+            tabIndex={0}
+            aria-label="Playing position in the jingle"
+            aria-valuemin={Math.round(start)}
+            aria-valuemax={Math.round(end)}
+            aria-valuenow={Math.round(clamp(playhead, start, end))}
+            aria-valuetext={clock(clamp(playhead, start, end))}
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+              dragging.current = "playhead"
+            }}
+            onPointerMove={(e) => { if (dragging.current === "playhead") onSeek(clamp(fromPointer(e.clientX), start, end)) }}
+            onPointerUp={() => { dragging.current = null }}
+            onPointerCancel={() => { dragging.current = null }}
+            onKeyDown={(e) => {
+              const step = e.shiftKey ? 5 : 1
+              const d = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -step : e.key === "ArrowRight" || e.key === "ArrowUp" ? step : 0
+              if (!d) return
+              e.preventDefault()
+              onSeek(clamp(clamp(playhead, start, end) + d, start, end))
+            }}
+            className="group absolute top-1/2 z-[5] flex h-6 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize touch-none items-center justify-center focus:outline-none"
+            style={{ left: pct(clamp(playhead, start, end)) }}
+          >
+            <span className="h-4 w-[3px] rounded-full bg-white shadow-[0_0_0_1px_#001f3f] group-hover:h-5 group-focus-visible:ring-2 group-focus-visible:ring-[#001f3f]" />
+          </span>
+          {handle("start")}
+          {handle("end")}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Slider({ label, value, min, max, unit = "", step, format, onChange }: {
+  label: string
+  value: number
+  min: number
+  max: number
+  unit?: string
+  step?: number
+  format?: (v: number) => string
+  onChange: (v: number) => void
+}) {
   return (
     <label className="block">
       <span className="mb-1 flex justify-between text-xs font-bold text-[#374151]">
-        {label} <span className="font-normal text-[#6b7280]">{value}{unit}</span>
+        {label} <span className="font-normal tabular-nums text-[#6b7280]">{format ? format(value) : `${value}${unit}`}</span>
       </span>
-      <input type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#001f3f]" />
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#001f3f]" />
     </label>
   )
 }
