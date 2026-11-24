@@ -19,7 +19,8 @@ const ROLES = ["agent", "team_leader"] as const
 
 type App = { id: string; client_name: string | null; created_at: string; last_used_at: string | null }
 
-const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors"
+// claude.ai's connectors list (Plugins → Connectors on a personal account, seen 2026-11-24).
+const CLAUDE_CONNECTORS_URL = "https://claude.ai/plugins?filter=connectors-only"
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "never")
 
@@ -121,7 +122,7 @@ export default function ConnectClaudePage() {
             <div className="min-w-0">
               <p className="font-semibold text-[#0d1117]">Open Claude&apos;s connectors</p>
               <p>
-                In claude.ai go to Customize, then Connectors, then Add custom connector. A free Claude account works (it allows one custom connector).
+                On a computer, open claude.ai and click Plugins in the left menu (on some accounts it is called Customize). Choose Connectors, then Add, then Add custom connector. A free Claude account works.
               </p>
               <a href={CLAUDE_CONNECTORS_URL} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#001f3f] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#002b57]">
                 Open claude.ai connectors <ExternalLink className="h-3.5 w-3.5" />
@@ -132,7 +133,7 @@ export default function ConnectClaudePage() {
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#001f3f] font-['Outfit'] text-[13px] font-bold text-white">2</span>
             <div className="min-w-0">
               <p className="font-semibold text-[#0d1117]">Fill in the connector</p>
-              <p>Name: FHI Global. Authentication: sign in. Server address:</p>
+              <p>Name: FHI Global. MCP server URL: paste this address, then press Continue.</p>
               <div className="mt-2 flex items-center gap-2 rounded-lg bg-[#f4f6f9] px-3 py-2">
                 <code className="min-w-0 flex-1 break-all font-mono text-[13px] text-[#0d1117]">{serverUrl}</code>
                 <CopyButton text={serverUrl} />
@@ -143,7 +144,7 @@ export default function ConnectClaudePage() {
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#001f3f] font-['Outfit'] text-[13px] font-bold text-white">3</span>
             <div className="min-w-0">
               <p className="font-semibold text-[#0d1117]">Sign in and press Allow</p>
-              <p>Claude opens the FHI sign-in. Use your usual FHI login, read what Claude will be able to see, and press Allow. Then ask Claude anything about your work.</p>
+              <p>Claude opens the FHI sign-in. Use your usual FHI login, read what Claude will be able to see, and press Allow. Then ask Claude anything about your work, on the computer or in the Claude app on your phone.</p>
             </div>
           </li>
         </ol>
