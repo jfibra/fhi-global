@@ -12,14 +12,14 @@ export const FILM_PREFIX = "FHI_GLOBAL/videos/about"
 export const FILM_BASE = `${(process.env.S3_PUBLIC_URL?.trim() || "https://filipinohomes123.s3.ap-southeast-1.amazonaws.com").replace(/\/$/, "")}/${FILM_PREFIX}`
 
 /** A film's three files by its base name, e.g. "fhi-landlords-mirasol" → -1080-v1.mp4, -720-v1.mp4, -poster-v1.jpg. */
-export function film(base: string, id: string, title: string, duration: string, ratio = 16 / 9): Film {
+export function film(base: string, id: string, title: string, duration: string, ratio = 16 / 9, version = "v1"): Film {
   return {
     id,
     title,
     duration,
-    poster: `${FILM_BASE}/${base}-poster-v1.jpg`,
-    hd: `${FILM_BASE}/${base}-1080-v1.mp4`,
-    sd: `${FILM_BASE}/${base}-720-v1.mp4`,
+    poster: `${FILM_BASE}/${base}-poster-${version}.jpg`,
+    hd: `${FILM_BASE}/${base}-1080-${version}.mp4`,
+    sd: `${FILM_BASE}/${base}-720-${version}.mp4`,
     ratio,
   }
 }
@@ -34,6 +34,23 @@ export const filmKey = (url: string) => `${FILM_PREFIX}/${url.split("/").pop() ?
  * "FHI Assistant Teaser" folder; the poster is its FHI-Assistant_Thumbnail_16x9.png.
  */
 export const ASSISTANT_TEASER = film("fhi-assistant-teaser", "fhi-assistant-teaser", "FHI Assistant — the 90-second tour", "1:30")
+
+/**
+ * Connect Claude, step by step (boss via Juliecor, 2026-11-24): a real screen recording of the whole set-up — FHI's
+ * Connect Claude page, claude.ai's connector form, the FHI sign-in and Allow, the first question — with the step names
+ * as captions, a natural voice (Kokoro, an open model run locally) and soft music. Played on the Connect
+ * Claude page (features/dashboard/connect-claude), whose chapter list seeks to CONNECT_CLAUDE_CHAPTERS. Re-record when
+ * claude.ai's screens change, and bump the version (files are cached for a year, so a new cut gets a new version).
+ */
+export const CONNECT_CLAUDE_TUTORIAL = film("fhi-connect-claude", "fhi-connect-claude", "Connect Claude, step by step", "1:09", 16 / 9, "v3")
+
+/** Where each step starts in the tutorial, in seconds (printed by the edit, 2026-11-24). */
+export const CONNECT_CLAUDE_CHAPTERS: ReadonlyArray<{ at: number; label: string }> = [
+  { at: 7, label: "Copy the FHI address" },
+  { at: 17, label: "Add the connector in Claude" },
+  { at: 37, label: "Sign in to FHI and press Allow" },
+  { at: 53, label: "Connected: ask your first question" },
+]
 
 /** The company films: the AVP and the Dubai event. */
 export const COMPANY_FILMS = {

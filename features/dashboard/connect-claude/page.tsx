@@ -5,6 +5,7 @@ import { Check, Copy, ExternalLink, Plug, Unplug } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
 import { roleInList } from "@/lib/app-roles"
+import { TutorialVideo } from "./tutorial-video"
 
 /**
  * Connect Claude (boss via Juliecor, 2026-11-24): how an agent or team
@@ -113,6 +114,8 @@ export default function ConnectClaudePage() {
           Ask your own Claude about your sales, leads{leader ? ", team" : ""} and recruits. It reads only your data, and only while you keep it connected.
         </p>
       </div>
+
+      <TutorialVideo className={card} />
 
       <section className={card}>
         <h2 className="font-['Outfit'] text-[17px] font-bold text-[#0d1117]">Three steps, once</h2>
