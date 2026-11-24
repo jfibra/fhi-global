@@ -332,10 +332,22 @@ const nextConfig = {
     // route handlers under /api/sitemap. The sitemap INDEX must reference only
     // these rewritten URLs: robots.txt disallows /api, and Google honors
     // robots.txt when fetching sitemaps.
-    return ["pages", "projects", "developers", "listings", "events", "news", "gallery", "agent-sites"].map((section) => ({
+    const sitemaps = ["pages", "projects", "developers", "listings", "events", "news", "gallery", "agent-sites"].map((section) => ({
       source: `/sitemap-${section}-:page(\\d+).xml`,
       destination: `/api/sitemap/${section}/:page`,
     }))
+    // The Claude sign-in's discovery files (lib/oauth/server.ts): the OAuth
+    // metadata Claude reads to find the sign-in page (RFC 8414, also tried as
+    // openid-configuration) and the resource metadata of POST /api/mcp/me
+    // (RFC 9728, root and path-based forms).
+    const oauth = [
+      { source: "/.well-known/oauth-authorization-server", destination: "/api/oauth/metadata" },
+      { source: "/.well-known/oauth-authorization-server/:path*", destination: "/api/oauth/metadata" },
+      { source: "/.well-known/openid-configuration", destination: "/api/oauth/metadata" },
+      { source: "/.well-known/oauth-protected-resource", destination: "/api/oauth/protected-resource" },
+      { source: "/.well-known/oauth-protected-resource/:path*", destination: "/api/oauth/protected-resource" },
+    ]
+    return [...sitemaps, ...oauth]
   },
   async redirects() {
     return [
@@ -471,6 +483,11 @@ const nextConfig = {
       },
       {
         source: "/internal/:path*",
+        headers: PRIVATE_NOINDEX_HEADERS,
+      },
+      {
+        // The Claude sign-in's consent page.
+        source: "/oauth/:path*",
         headers: PRIVATE_NOINDEX_HEADERS,
       },
       {

@@ -104,6 +104,8 @@ const SUB_PATH_ROLES: Record<string, readonly string[]> = {
   "fhi-chat": [...ROLES_ADMIN_STAFF, ...ROLES_AGENT_ASSISTANT],
   // Their four share links in one place (features/dashboard/links).
   links: ["agent", "team_leader"],
+  // Connect Claude: their own Claude signed in with their FHI login (POST /api/mcp/me, lib/oauth/server.ts).
+  "connect-claude": ["agent", "team_leader"],
   // The merchant dashboard (features/dashboard/merchant, migration 092): the
   // merchant's own QR, closed deals, documents and business profile.
   qr: ["merchant"],
@@ -138,7 +140,8 @@ export function pickSafePostLoginRedirect(nextRaw: string | null | undefined, ro
   } catch {
     return fallback
   }
-  if (pathname !== "/buy" && pathname !== "/rent") return fallback
+  // /oauth/authorize: the Claude sign-in's consent page sends a signed-out person to the login and must get them back (lib/oauth/server.ts).
+  if (pathname !== "/buy" && pathname !== "/rent" && pathname !== "/oauth/authorize") return fallback
   return pathname + search
 }
 

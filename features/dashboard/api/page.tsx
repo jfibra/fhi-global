@@ -1,10 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Check, Copy, ExternalLink, Eye, EyeOff, KeyRound, RefreshCw, Sparkles, Webhook } from "lucide-react"
+import { Check, Copy, ExternalLink, Eye, EyeOff, KeyRound, RefreshCw, Sparkles, Unplug, Webhook } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useRequireAllowed } from "@/components/auth/use-require-allowed"
-import { isAdminStaffRole } from "@/lib/app-roles"
+import { isAdminStaffRole, roleToLabel } from "@/lib/app-roles"
 import { API_ENDPOINTS, canSeeApiPage, type ApiEndpoint } from "@/lib/api-catalog"
 
 /**
@@ -42,6 +42,90 @@ function CopyButton({ text, label = "Copy", className = "" }: { text: string; la
       {done ? <Check className="h-3.5 w-3.5 text-[#059669]" /> : <Copy className="h-3.5 w-3.5" />}
       {done ? "Copied" : label}
     </button>
+  )
+}
+
+type SignIn = { id: string; user_id: string; name: string | null; role: string | null; status: string | null; client_name: string | null; created_at: string; last_used_at: string | null }
+
+const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "never")
+
+/** Who connected their own Claude through the sign-in (POST /api/mcp/me), with Disconnect. */
+function ClaudeSignIns() {
+  const [rows, setRows] = useState<SignIn[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  useEffect(() => {
+    let live = true
+    void fetch("/api/admin/connected-apps", { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ apps: SignIn[] }>) : Promise.reject(new Error("Couldn't load the Claude sign-ins."))))
+      .then((d) => {
+        if (live) setRows(d.apps)
+      })
+      .catch((e: Error) => {
+        if (live) setError(e.message)
+      })
+    return () => {
+      live = false
+    }
+  }, [])
+
+  const disconnect = async (id: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/admin/connected-apps/${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Couldn't disconnect.")
+      setRows((list) => (list ?? []).filter((r) => r.id !== id))
+    } catch {
+      setError("Couldn't disconnect. Try again.")
+    } finally {
+      setBusy(null)
+      setConfirming(null)
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-[#e8eaed] bg-white px-5 py-4 shadow-[0_2px_12px_-2px_rgba(0,31,63,0.06)]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-['Outfit'] text-[16px] font-bold text-[#001f3f]">Claude sign-ins</p>
+        {rows ? <span className="text-[13px] text-[#6b7280]">{rows.length ? `${rows.length} connected` : "Nobody connected yet"}</span> : null}
+      </div>
+      <p className="mt-1 text-[14px] text-[#374151]">
+        Agents and team leaders who connected their own Claude with their FHI login (Connect Claude in their dashboard). Each reads only their own data. Disconnecting refuses their next call; they can connect again.
+      </p>
+      {error ? <p className="mt-3 text-[14px] text-[#b42318]">{error}</p> : null}
+      {rows && rows.length ? (
+        <ul className="mt-3 divide-y divide-[#f0f2f5]">
+          {rows.map((r) => (
+            <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <p className="font-semibold text-[#0d1117]">
+                  {r.name ?? "Unknown account"} <span className="font-normal text-[#6b7280]">· {roleToLabel(r.role)}</span>
+                </p>
+                <p className="text-[13px] text-[#6b7280]">
+                  {r.client_name?.trim() || "Claude"} · connected {when(r.created_at)} · last used {when(r.last_used_at)}
+                </p>
+              </div>
+              {confirming === r.id ? (
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => void disconnect(r.id)} disabled={busy === r.id} className="rounded-lg bg-[#b42318] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#912018] disabled:opacity-60">
+                    {busy === r.id ? "Disconnecting…" : "Yes, disconnect"}
+                  </button>
+                  <button type="button" onClick={() => setConfirming(null)} className="rounded-lg border border-[#e8eaed] bg-white px-3 py-1.5 text-[13px] font-semibold text-[#001f3f] hover:bg-[#f4f6f9]">
+                    Keep
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setConfirming(r.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e8eaed] bg-white px-3 py-1.5 text-[13px] font-semibold text-[#001f3f] hover:bg-[#f4f6f9]">
+                  <Unplug className="h-3.5 w-3.5" /> Disconnect
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   )
 }
 
@@ -220,7 +304,8 @@ export default function ApiPage() {
             <p className="font-['Outfit'] text-[16px] font-bold text-[#001f3f]">Connect to Claude (MCP)</p>
             <p className="mt-1 text-[14px] text-[#374151]">
               Every endpoint below is a read-only tool Claude can call while you chat: sales, top sellers, sales summary, accounts, projects, developers, teams, events, merchants. So is everything the admin FHI Assistant can read: website traffic and search keywords from Google, leads, the pipeline, tickets, purchases, websites, listings, clients, reviews, the activity log, member lookup, owner documents, events, news, data health. The server is{" "}
-              <code className="rounded bg-[#f4f6f9] px-1.5 py-0.5 font-mono text-[12.5px]">{status?.site ?? base}/api/mcp</code> and it takes the same key.
+              <code className="rounded bg-[#f4f6f9] px-1.5 py-0.5 font-mono text-[12.5px]">{status?.site ?? base}/api/mcp</code> and it takes the same key. Agents and team leaders use the sign-in address{" "}
+              <code className="rounded bg-[#f4f6f9] px-1.5 py-0.5 font-mono text-[12.5px]">{status?.site ?? base}/api/mcp/me</code> from Connect Claude in their dashboard: no key, their FHI login, and their Claude reads only their own data (an admin signing in there gets these same tools).
             </p>
             <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
               <div className="rounded-xl border border-[#e8eaed] bg-[#f8fafc] px-4 py-3 text-[13.5px] leading-relaxed text-[#374151]">
@@ -256,6 +341,8 @@ export default function ApiPage() {
           </div>
         </div>
       </section>
+
+      <ClaudeSignIns />
 
       {API_ENDPOINTS.map((e) => (
         <EndpointCard key={e.key} e={e} base={base} apiKey={apiKey} />
