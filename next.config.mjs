@@ -241,6 +241,12 @@ const nextConfig = {
     "/api/admin/meeting-poster": SHARP_LINUX_LIBS,
     // "Email this poster" renders the same poster inside the admin chat route.
     "/api/admin/fhi-chat": SHARP_LINUX_LIBS,
+    // The automatic event poster (lib/events/poster.tsx: backdrop through ogPicture, output through sharp) is drawn by
+    // Claude's event tools, and again by updateEvent() on any save that changes what it prints — so the dashboard's
+    // event routes reach it too. The card's Add photo upload re-encodes the picture with sharp.
+    "/api/mcp/me": SHARP_LINUX_LIBS,
+    "/api/admin/events": SHARP_LINUX_LIBS,
+    "/api/events/cover": SHARP_LINUX_LIBS,
   },
   // Loaded from node_modules at run time instead of bundled: @napi-rs/canvas is
   // a native addon, and pdf.js finds it, and its own data files, relative to

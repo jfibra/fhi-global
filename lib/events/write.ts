@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { agentWebsite, placementIssue, type EventScope } from "@/lib/events/access"
 import { eventPublicPath } from "@/lib/events/paths"
+import { POSTER_DRAWN_FIELDS, isAutoPosterUrl } from "@/lib/events/poster-url"
 import type { sanitizeEventInput } from "@/lib/events/validate"
 import { logAuditEvent, type AuditActor, type AuditRequestContext } from "@/lib/audit-log"
 import { SITE_URL } from "@/lib/seo"
@@ -209,6 +210,19 @@ export async function updateEvent(
       changedKeys,
       ...meta.request,
     })
+  }
+
+  // An automatic poster prints the title, the date and the venue: when one of
+  // them changed — from the dashboard or from Claude — it is drawn again, so the
+  // cover never shows an old date (lib/events/poster.tsx; loaded only when
+  // needed). A photo someone uploaded is not a poster and is left alone.
+  if (isAutoPosterUrl(input.image_url) && changedKeys.some((k) => (POSTER_DRAWN_FIELDS as readonly string[]).includes(k))) {
+    try {
+      const { refreshAutoPoster } = await import("@/lib/events/poster")
+      await refreshAutoPoster(admin, id)
+    } catch (e) {
+      console.error("[events] poster refresh", e instanceof Error ? e.message : e)
+    }
   }
 
   // Purge the public page immediately (a draft flip must not serve stale for

@@ -7,9 +7,11 @@ import type { AuditActor, AuditRequestContext } from "@/lib/audit-log"
 import { agentWebsite, placementIssue, type EventScope } from "@/lib/events/access"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
 import { CERTIFICATE_DEFAULTS } from "@/lib/events/certificate"
+import { signCoverTicket } from "@/lib/events/cover"
 import { MAX_EVENT_DAYS, dubaiHHMM, dubaiYMD, eventIsPast, eventSchedule, eventWhenLabel, normalizeEventDays } from "@/lib/events/dates"
 import { MAX_DAY_PAX, normalizeDayPax } from "@/lib/events/pax"
 import { eventPublicPath } from "@/lib/events/paths"
+import { DEFAULT_POSTER, cleanPosterSettings, isAutoPosterUrl, posterSettingsOf, type PosterSettings } from "@/lib/events/poster-url"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { createEvent, updateEvent, type EventWriteMeta } from "@/lib/events/write"
 import { EVENT_CARD_TOOL_META, registerEventCard } from "@/lib/mcp/event-card"
@@ -60,6 +62,21 @@ import { EVENT_CARD_TOOL_META, registerEventCard } from "@/lib/mcp/event-card"
  * What the person SEES: every tool points at the event card
  * (lib/mcp/event-card.ts), which Claude shows in the chat with the tool's
  * answer — photo, date, venue, seats, Draft / Live, what is missing.
+ *
+ * The cover photo (2026-11-27) — nobody has to upload one:
+ *   · an event created here without a photo gets a POSTER FHI draws
+ *     (lib/events/poster.tsx) from its title, date, time and venue, with the
+ *     tagline, design and background project Claude passes (poster_*). It is
+ *     drawn again by updateEvent() whenever what it prints changes;
+ *   · copy_from never copies an automatic poster (it prints the old date):
+ *     the new event gets its own, in the same look;
+ *   · a person's own photo always wins: a reused photo (photo_from), one
+ *     uploaded in the dashboard, or one added with the card's Add photo
+ *     button. Claude cannot pass a picture from the chat, so the card
+ *     uploads it itself to POST /api/events/cover with the signed link this
+ *     file puts in the answer's structuredContent — which the model never
+ *     reads (lib/events/cover.ts);
+ *   · use_poster replaces a photo with a poster only when the person asks.
  */
 
 export type EventWriter = {
@@ -121,7 +138,16 @@ class Problem extends Error {
   }
 }
 
-const reply = (payload: unknown, isError = false) => ({ content: [{ type: "text" as const, text: JSON.stringify(payload) }], isError })
+/**
+ * A tool's answer. `payload` is the JSON text Claude reads (and the card
+ * parses); `ui` rides in structuredContent, which Claude reads only when
+ * there is no text at all — so it reaches the card alone.
+ */
+const reply = (payload: unknown, isError = false, ui?: Record<string, unknown>) => ({
+  content: [{ type: "text" as const, text: JSON.stringify(payload) }],
+  isError,
+  ...(ui ? { structuredContent: { ui } } : {}),
+})
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 /** A literal for ILIKE: the pattern characters lose their meaning. */
@@ -261,7 +287,7 @@ function missingOf(r: Row, w: EventWriter): Missing[] {
     out.push({ what: "Description", needed_to_publish: true, how_to_fix: "Offer to write it from a few notes, show it to the person, then save it with fhi_event_update." })
   }
   if (!r.image_url) {
-    out.push({ what: "Cover photo", needed_to_publish: false, how_to_fix: `A new photo is uploaded in the dashboard: ${editUrl(r, w)} — or reuse a past event's photo with photo_from.` })
+    out.push({ what: "Cover photo", needed_to_publish: false, how_to_fix: `Call fhi_event_update with use_poster true and FHI draws a poster for it; or the person adds their own with the Add photo button on the card, or in the dashboard: ${editUrl(r, w)}` })
   }
   if (r.venue?.trim() && !pinOf(r)) {
     out.push({ what: "Map pin for the venue", needed_to_publish: false, how_to_fix: `Pick the venue from the suggestions in the dashboard: ${editUrl(r, w)} — or reuse a past event's venue with venue_from.` })
@@ -277,6 +303,7 @@ function describe(r: Row, w: EventWriter) {
   const missing = missingOf(r, w).filter((m) => status !== "published" || !m.needed_to_publish)
   const past = eventIsPast(r.event_date, r.event_days, Date.now(), r.day_times)
   const seats = normalizeDayPax(r.day_pax, days)
+  const poster = posterSettingsOf(r.image_url)
   return {
     id: r.id,
     title: r.title,
@@ -291,6 +318,8 @@ function describe(r: Row, w: EventWriter) {
     has_map_pin: Boolean(pinOf(r)),
     has_cover_photo: Boolean(r.image_url),
     cover_photo: r.image_url ?? null,
+    cover: r.image_url ? (isAutoPosterUrl(r.image_url) ? "automatic poster" : "own photo") : "none",
+    ...(poster ? { poster: { design: poster.design, tagline: poster.tagline || "You're invited", ...(poster.projectId ? { background: "a project's photo" } : {}) } } : {}),
     description: r.description ?? null,
     brand: eventBrand(r.brand).name,
     registration_open: r.registration_open !== false,
@@ -298,6 +327,8 @@ function describe(r: Row, w: EventWriter) {
     open_in_dashboard: editUrl(r, w),
     public_page: status === "published" ? publicUrl(r, w) : `${publicUrl(r, w)} (works once it is published)`,
     ready_to_publish: status !== "published" && !missing.some((m) => m.needed_to_publish),
+    // A draft this person may change from Claude — also what gives the card its Add photo button.
+    can_change_here: status === "draft" && (ownerOf(w) ? r.agent_id === ownerOf(w) : !r.agent_id),
     missing,
   }
 }
@@ -354,9 +385,16 @@ const FIELDS = {
   registration_open: z.boolean().optional().describe("Whether people can sign up on the page (true when not said)"),
   venue_from: REF.optional().describe("Reuse the venue AND its map pin from another event: its id, or words from its title (the most recent match is taken)"),
   photo_from: REF.optional().describe("Reuse the cover photo of another event: its id, or words from its title (the most recent match is taken)"),
+  poster_tagline: z.string().max(60).optional().describe("For the poster FHI draws when the event has no photo: the short line above the title, 2 to 5 words that fit the event (e.g. \"Open house weekend\"). \"You're invited\" when left out."),
+  poster_design: z.enum(["skyline", "navy"]).optional().describe("The poster's look: skyline = the Dubai skyline behind a navy veil (when not said), navy = deep navy with a gold glow."),
+  poster_background: z.string().max(120).optional().describe("Put a project's photo behind the poster's title instead of the skyline: the project's name, e.g. \"Azizi Venice\". \"skyline\" goes back to the skyline."),
 }
 
 type FieldArgs = {
+  poster_tagline?: string
+  poster_design?: "skyline" | "navy"
+  poster_background?: string
+  use_poster?: boolean
   where?: "fhiglobal" | "website" | "both"
   title?: string
   date?: string
@@ -394,6 +432,38 @@ const FIELD_WORDS: Record<string, string> = {
   venue_lat: "map pin",
   venue_lng: "map pin",
   venue_place_id: "map pin",
+}
+
+/* ───────────────────────── the automatic poster ───────────────────────── */
+
+const posterAsked = (a: FieldArgs) => a.poster_design !== undefined || a.poster_tagline !== undefined || a.poster_background !== undefined
+
+/** The project named for the poster's background: its id; null for "skyline"; undefined (with a note) when none matches. */
+async function posterProject(name: string, notes: string[]): Promise<number | null | undefined> {
+  const q = name.trim()
+  if (!q || /^skyline$/i.test(q)) return null
+  let query = createAdminSupabase().from("projects").select("id, name").is("deleted_at", null).not("main_image", "is", null)
+  for (const word of q.split(/\s+/).filter(Boolean).slice(0, 6)) query = query.ilike("name", `%${literal(word)}%`)
+  const { data } = await query.limit(6)
+  const rows = (data ?? []) as { id: number; name: string }[]
+  const hit = rows.find((r) => r.name.trim().toLowerCase() === q.toLowerCase()) ?? rows[0]
+  if (!hit) {
+    notes.push(`No project with a photo matches "${q}", so the poster kept its background.`)
+    return undefined
+  }
+  return Number(hit.id)
+}
+
+/** How the poster should be drawn: the look it had (or the default), with what the person asked for on top. */
+async function posterSettings(a: FieldArgs, base: PosterSettings | null, notes: string[]): Promise<PosterSettings> {
+  const s: PosterSettings = { ...(base ?? DEFAULT_POSTER) }
+  if (a.poster_design) s.design = a.poster_design
+  if (a.poster_tagline !== undefined) s.tagline = a.poster_tagline
+  if (a.poster_background !== undefined) {
+    const id = await posterProject(a.poster_background, notes)
+    if (id !== undefined) s.projectId = id
+  }
+  return cleanPosterSettings(s)
 }
 
 /* ───────────────────────── create ───────────────────────── */
@@ -449,9 +519,16 @@ async function create(a: FieldArgs & { copy_from?: string }, w: EventWriter) {
     pin = pinOf(from)
   }
 
-  let image = from?.image_url ?? ""
+  // The cover: a real photo reused from another event; otherwise the poster FHI draws once the event is saved.
+  // An automatic poster is never copied — it prints the other event's date — only its look is.
+  let image = from?.image_url && !isAutoPosterUrl(from.image_url) ? from.image_url : ""
+  let look: PosterSettings | null = posterSettingsOf(from?.image_url)
   if (photoSrc) {
-    if (photoSrc.row.image_url) image = photoSrc.row.image_url
+    if (isAutoPosterUrl(photoSrc.row.image_url)) {
+      image = ""
+      look = posterSettingsOf(photoSrc.row.image_url)
+      notes.push(`"${photoSrc.row.title}" has an automatic poster, which prints its own date, so a new poster in the same look was drawn.`)
+    } else if (photoSrc.row.image_url) image = photoSrc.row.image_url
     else notes.push(`"${photoSrc.row.title}" has no cover photo, so none was reused.`)
   }
 
@@ -502,10 +579,21 @@ async function create(a: FieldArgs & { copy_from?: string }, w: EventWriter) {
 
   const made = await createEvent(admin, { input, ownerId, site, meta })
   if (!made.ok) throw new Error(made.error)
-  const row = await rowById(made.id)
+  let row = await rowById(made.id)
+  if (!row.image_url) {
+    // No photo: FHI draws the poster and makes it the cover, so nobody has to upload one.
+    const { drawEventPoster } = await import("@/lib/events/poster")
+    const url = await drawEventPoster(admin, row, await posterSettings(a, look, notes))
+    if (url) {
+      await admin.from("events").update({ image_url: url }).eq("id", row.id)
+      row = await rowById(row.id)
+    } else notes.push("The poster could not be drawn just now, so the event has no cover photo yet.")
+  } else if (posterAsked(a)) {
+    notes.push("The event took an existing photo, so no poster was drawn. If the person wants a poster instead, call fhi_event_update with use_poster true.")
+  }
   return {
     saved: true,
-    say: "Saved as a DRAFT: it is not public yet. Tell the person what was saved and what is still missing, and offer to fill what you can. Publish only when they ask.",
+    say: `Saved as a DRAFT: it is not public yet.${isAutoPosterUrl(row.image_url) ? " FHI drew a poster and set it as the cover photo; the card shows it." : ""} Tell the person what was saved and what is still missing, and offer to fill what you can. Publish only when they ask.`,
     ...(copy ? { copied_from: brief(copy.row), ...(copy.others.length ? { other_matches_not_used: copy.others } : {}) } : {}),
     ...(notes.length ? { notes } : {}),
     event: describe(row, w),
@@ -528,7 +616,7 @@ async function update(a: FieldArgs & { event: string }, w: EventWriter) {
   const venueSrc = a.venue_from ? await source(a.venue_from, "venue", w) : null
   const photoSrc = a.photo_from ? await source(a.photo_from, "cover photo", w) : null
 
-  const given = (["title", "date", "start_time", "days", "day_times", "seats", "seats_per_day", "venue", "description", "brand", "video_url", "registration_open", "venue_from", "photo_from", "where"] as const).filter((k) => a[k] !== undefined)
+  const given = (["title", "date", "start_time", "days", "day_times", "seats", "seats_per_day", "venue", "description", "brand", "video_url", "registration_open", "venue_from", "photo_from", "where", "poster_tagline", "poster_design", "poster_background", "use_poster"] as const).filter((k) => a[k] !== undefined)
   if (!given.length) throw new Problem({ saved: false, problem: "No change was given.", do: "Send the fields to change." })
 
   // The dashboard's whole payload, from the saved row, with the changes on top.
@@ -589,6 +677,9 @@ async function update(a: FieldArgs & { event: string }, w: EventWriter) {
 
   if (photoSrc) {
     if (!photoSrc.row.image_url) throw new Problem({ saved: false, problem: `"${photoSrc.row.title}" has no cover photo.`, do: "Ask the person for another event to take the photo from, or upload one in the dashboard." })
+    if (isAutoPosterUrl(photoSrc.row.image_url)) {
+      throw new Problem({ saved: false, problem: `"${photoSrc.row.title}" has an automatic poster, which prints its own date and venue, so it cannot be reused.`, do: "Call fhi_event_update with use_poster true to draw this event its own poster." })
+    }
     body.image_url = photoSrc.row.image_url
   }
   if (a.video_url !== undefined) body.video_url = a.video_url
@@ -599,6 +690,22 @@ async function update(a: FieldArgs & { event: string }, w: EventWriter) {
 
   const input = sanitizeEventInput(body)
   if (a.video_url && !input.video_url) notes.push("The video link is not one the website can play, so it was left out.")
+
+  // A poster was asked for (a new look, or "a poster instead of the photo"): drawn from the values being saved, in the same save.
+  if (posterAsked(a) || a.use_poster) {
+    if (input.image_url && !isAutoPosterUrl(input.image_url) && !a.use_poster) {
+      notes.push("The event has its own photo, which was kept. If the person wants a poster instead of the photo, call again with use_poster true.")
+    } else {
+      const { drawEventPoster } = await import("@/lib/events/poster")
+      const url = await drawEventPoster(
+        admin,
+        { id: row.id, title: input.title, brand: input.brand, event_date: input.event_date, event_days: input.event_days ?? row.event_days, day_times: input.day_times ?? row.day_times, venue: input.venue },
+        await posterSettings(a, posterSettingsOf(row.image_url), notes),
+      )
+      if (url) input.image_url = url
+      else notes.push("The poster could not be drawn just now, so the cover was left as it is.")
+    }
+  }
 
   const saved = await updateEvent(admin, { id: row.id, input, scope: w.scope, meta: { actor: w.actor, source: "claude", request: w.request } })
   if (!saved.ok) {
@@ -735,18 +842,32 @@ function eventToolRules(w: EventWriter): string[] {
     ownerOf(w)
       ? "Publish only when the person asks for it. Nothing can be deleted from here. Registrations, certificates and emails are handled in the FHI dashboard: give the open_in_dashboard link."
       : "Publish only when the person asks for it. Nothing can be deleted from here. Agents' own events, registrations, certificates and emails are handled in the FHI dashboard: give the open_in_dashboard link.",
+    "Do not ask the person for a photo. An event without one gets a poster FHI draws from its title, date, time and venue and sets as the cover: pass poster_tagline, a short line of 2 to 5 words that fits the event. The poster is drawn again by itself when the title, date or venue changes. The person can ask for the other design (poster_design) or a project's photo behind the title (poster_background). You cannot pass a picture from the chat to FHI: when the person wants their own photo, tell them to press Add photo on the card (it uploads from their device), or to use the dashboard. Their own photo always replaces the poster; use_poster goes back to a poster only when they ask.",
     "Each event tool also shows the person a card in the chat with the event's photo, date, venue, seats, status, what is missing and an Open in dashboard button. Do not repeat the card field by field: say in a sentence or two what happened and what the next step is.",
   ]
 }
 
 type ToolResult = ReturnType<typeof reply>
 
+/**
+ * What only the card needs: the signed link its Add photo button uploads to
+ * (POST /api/events/cover, lib/events/cover.ts) — for a draft this person
+ * may change, valid twelve hours, bound to that event and that person.
+ */
+function cardExtras(payload: unknown, w: EventWriter): Record<string, unknown> | undefined {
+  const ev = (payload as { event?: { id?: unknown; can_change_here?: unknown } } | null)?.event
+  if (!ev || typeof ev.id !== "string" || ev.can_change_here !== true || !w.actor.id) return undefined
+  const ticket = signCoverTicket({ eventId: ev.id, actorId: w.actor.id, scope: w.scope.kind })
+  return ticket ? { add_photo: { url: `${w.origin}/api/events/cover?t=${ticket.token}`, expires: ticket.expires } } : undefined
+}
+
 /** Runs a tool body; a Problem becomes its payload, anything else a plain apology (and a server log). */
 async function run(name: string, w: EventWriter, body: () => Promise<unknown>): Promise<ToolResult> {
   try {
     const owner = ownerOf(w)
     if (owner && w.site === undefined) w.site = await agentWebsite(createAdminSupabase(), owner)
-    return reply(await body())
+    const payload = await body()
+    return reply(payload, false, cardExtras(payload, w))
   } catch (e) {
     if (e instanceof Problem) return reply(e.payload, true)
     console.error(`[mcp/events] ${name}`, e instanceof Error ? e.message : e)
@@ -756,7 +877,7 @@ async function run(name: string, w: EventWriter, body: () => Promise<unknown>): 
 
 export function registerEventTools(server: McpServer, w: EventWriter): void {
   // The card Claude shows with each answer; every tool below points at it.
-  registerEventCard(server)
+  registerEventCard(server, w.origin)
   const own = Boolean(ownerOf(w))
   // Whose event, in the words the tool descriptions use.
   const an = own ? "one of the person's OWN events" : "a COMPANY event"
@@ -790,7 +911,11 @@ export function registerEventTools(server: McpServer, w: EventWriter): void {
     {
       title: "FHI · change a draft event",
       description: `Change ${an} that is still a DRAFT: send only the fields that change. A live event is refused (take it back to draft first, or use the dashboard). Changing the venue's text removes its old map pin; venue_from brings a venue with its pin. Answers with what changed and what is still missing.`,
-      inputSchema: z.object({ event: REF.describe("The event: its id (best), or its exact title / words from it"), ...fields }),
+      inputSchema: z.object({
+        event: REF.describe("The event: its id (best), or its exact title / words from it"),
+        ...fields,
+        use_poster: z.boolean().optional().describe("true = draw a poster and make it the cover, replacing the photo the event has now. Only when the person asks for a poster instead of the photo, or the event has no cover."),
+      }),
       annotations: CHANGES,
       _meta: EVENT_CARD_TOOL_META,
     },

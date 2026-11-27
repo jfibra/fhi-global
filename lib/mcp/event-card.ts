@@ -29,14 +29,26 @@ import type { McpServer } from "@modelcontextprotocol/server"
  * - The only outside thing it loads is the cover photo, from the storage
  *   origin declared in `_meta.ui.csp.resourceDomains`. Everything is written
  *   with textContent; links open through the host, which asks first.
- * - No button that writes: a call from the card would skip Claude's approval
- *   prompt, so publishing stays a sentence the person says.
+ * - No button that calls a tool: a call from the card would skip Claude's
+ *   approval prompt, so publishing stays a sentence the person says.
+ * - One thing the card does itself (v2, 2026-11-27): "Add your photo". Claude
+ *   cannot pass a picture from the chat to a tool, so the person picks a file
+ *   here, the card shrinks it on a canvas and posts it straight to
+ *   POST /api/events/cover with the signed link the tool put in
+ *   structuredContent (which the model does not read). The site's origin is
+ *   therefore in `_meta.ui.csp.connectDomains`. The route decides everything;
+ *   the card only shows what it answers. Whether a host lets a frame open a
+ *   file picker is not documented, so Open in dashboard stays beside it.
  *
  * Claude may keep a copy of the page: after changing it, bump the version in
- * EVENT_CARD_URI so every chat gets the new one.
+ * EVENT_CARD_URI so every chat gets the new one — and keep the older address
+ * registered (EVENT_CARD_URIS_BEFORE), because a connector added earlier
+ * still asks for the page by the address its tool list was read with.
  */
 
-export const EVENT_CARD_URI = "ui://fhi-global/event-card-v1"
+export const EVENT_CARD_URI = "ui://fhi-global/event-card-v2"
+/** Addresses earlier tool lists point at: they serve the same, current page. */
+const EVENT_CARD_URIS_BEFORE = ["ui://fhi-global/event-card-v1"]
 export const MCP_APP_MIME = "text/html;profile=mcp-app"
 
 /** What a tool's definition carries so the host shows the card (the nested key, plus the flat one older hosts read). */
@@ -54,22 +66,21 @@ function photoOrigins(): string[] {
   return [...out]
 }
 
-export function registerEventCard(server: McpServer): void {
-  server.registerResource(
-    "FHI event card",
-    EVENT_CARD_URI,
-    { title: "FHI event card", description: "The card Claude shows for an FHI event: photo, date, venue, seats, status and what is still missing.", mimeType: MCP_APP_MIME },
-    async (uri) => ({
-      contents: [
-        {
-          uri: uri.href,
-          mimeType: MCP_APP_MIME,
-          text: EVENT_CARD_HTML,
-          _meta: { ui: { csp: { resourceDomains: photoOrigins() }, prefersBorder: true } },
-        },
-      ],
-    }),
-  )
+/** `origin` is this site (the issuer the route computed): the one place the card may send a photo to. */
+export function registerEventCard(server: McpServer, origin: string): void {
+  const read = async (uri: URL) => ({
+    contents: [
+      {
+        uri: uri.href,
+        mimeType: MCP_APP_MIME,
+        text: EVENT_CARD_HTML,
+        _meta: { ui: { csp: { resourceDomains: photoOrigins(), connectDomains: [origin] }, prefersBorder: true } },
+      },
+    ],
+  })
+  const about = { title: "FHI event card", description: "The card Claude shows for an FHI event: photo, date, venue, seats, status, what is still missing, and Add your photo.", mimeType: MCP_APP_MIME }
+  server.registerResource("FHI event card", EVENT_CARD_URI, about, read)
+  EVENT_CARD_URIS_BEFORE.forEach((uri, i) => server.registerResource(`FHI event card (earlier address ${i + 1})`, uri, about, read))
 }
 
 // String.raw: the script below is sent exactly as written (no escapes are processed here).
@@ -172,6 +183,11 @@ export const EVENT_CARD_HTML = String.raw`<!doctype html>
   button { appearance: none; font: inherit; font-weight: var(--font-weight-medium, 500); min-height: 44px; padding: 0 16px; border-radius: var(--rs); border: var(--border-width-regular, 1px) solid var(--bd); background: transparent; color: var(--t1); cursor: pointer; }
   button.primary { background: var(--inv); color: var(--invt); border-color: transparent; }
   button:focus-visible { outline: 2px solid var(--color-ring-primary, var(--gold)); outline-offset: 2px; }
+  button[disabled] { opacity: 0.6; cursor: default; }
+  .cap { margin: 4px 0 0; font-size: 12px; color: var(--t3); }
+  .status { margin: 10px 0 0; font-size: 13px; color: var(--t2); min-height: 0; overflow-wrap: anywhere; }
+  .status.bad { color: var(--bad); }
+  .status.ok { color: var(--ok); }
   @media (max-width: 380px) { .actions button { flex: 1 1 100%; } dt { flex-basis: 56px; } }
   /* When the host gives a height limit and the card is taller: a small photo first, then none. */
   .card.compact .head { flex-direction: row; gap: 12px; }
@@ -193,6 +209,8 @@ export const EVENT_CARD_HTML = String.raw`<!doctype html>
   var card = document.getElementById("card");
   var nextId = 1;
   var waiting = {};
+  var caps = {};      /* what the host offers (from ui/initialize) */
+  var shown = null;   /* the event on the card now: { p, e, ui } */
 
   /* ── the protocol: JSON-RPC over postMessage ── */
   function post(message) { message.jsonrpc = "2.0"; host.postMessage(message, "*"); }
@@ -321,7 +339,8 @@ export const EVENT_CARD_HTML = String.raw`<!doctype html>
     return frag;
   }
 
-  function showEvent(p, e) {
+  function showEvent(p, e, ui) {
+    shown = { p: p, e: e, ui: ui || null };
     clear();
     var head = el("div", "head"), info = el("div", "info");
     if (isHttps(e.cover_photo)) {
@@ -344,6 +363,7 @@ export const EVENT_CARD_HTML = String.raw`<!doctype html>
     info.appendChild(el("h1", "", e.title));
     var line = headline(p);
     if (line) info.appendChild(el("p", p.saved === false && p.problem ? "note bad" : "note", line));
+    if (e.cover === "automatic poster") info.appendChild(el("p", "cap", "Cover: a poster FHI drew for this event."));
 
     var dl = el("dl");
     function row(label, value, small, smallOk) {
@@ -380,8 +400,82 @@ export const EVENT_CARD_HTML = String.raw`<!doctype html>
     var actions = el("div", "actions");
     if (isWeb(e.open_in_dashboard)) actions.appendChild(button("Open in dashboard", e.open_in_dashboard, true));
     if (live && isWeb(e.public_page)) actions.appendChild(button("View page", e.public_page, false));
+    var ticket = !live && ui && ui.add_photo && isWeb(ui.add_photo.url) ? ui.add_photo : null;
+    if (ticket) {
+      var add = el("button", "", e.cover === "own photo" ? "Change photo" : "Add your photo");
+      add.type = "button";
+      add.addEventListener("click", function () { pickPhoto(ticket, add); });
+      actions.appendChild(add);
+    }
     if (actions.firstChild) card.appendChild(actions);
+    var st = el("p", "status"); st.id = "status"; st.setAttribute("role", "status");
+    card.appendChild(st);
     fit();
+  }
+
+  /* ── Add your photo: pick, shrink on a canvas, post to FHI with the signed link ── */
+  function say(text, kind) {
+    var st = document.getElementById("status");
+    if (!st) return;
+    st.className = "status" + (kind ? " " + kind : "");
+    st.textContent = text || "";
+    fit();
+  }
+  function pickPhoto(ticket, btn) {
+    if (ticket.expires && Date.now() > ticket.expires * 1000) { say("This button has expired. Ask Claude to show the event again, then press it.", "bad"); return; }
+    var input = document.createElement("input");
+    input.type = "file"; input.accept = "image/*"; input.style.display = "none";
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      if (input.parentNode) input.parentNode.removeChild(input);
+      if (file) sendPhoto(file, ticket, btn);
+    });
+    document.body.appendChild(input);
+    input.click();
+  }
+  /* at most 1920 px on the long side, as JPEG; a browser without createImageBitmap sends the file as it is */
+  function shrink(file) {
+    if (typeof createImageBitmap !== "function") return Promise.resolve(file);
+    return createImageBitmap(file).then(function (bmp) {
+      var scale = Math.min(1, 1920 / Math.max(bmp.width, bmp.height));
+      var c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(bmp.width * scale)); c.height = Math.max(1, Math.round(bmp.height * scale));
+      var g = c.getContext("2d");
+      g.fillStyle = "#ffffff"; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(bmp, 0, 0, c.width, c.height);
+      if (bmp.close) bmp.close();
+      return new Promise(function (resolve) { c.toBlob(function (b) { resolve(b || file); }, "image/jpeg", 0.88); });
+    }).catch(function () { return file; });
+  }
+  function sendPhoto(file, ticket, btn) {
+    if (!/^image\//.test(file.type || "")) { say("That file is not a picture. Choose a JPG or PNG photo.", "bad"); return; }
+    btn.disabled = true;
+    say("Preparing the photo…", "");
+    shrink(file).then(function (blob) {
+      if (blob.size > 4 * 1024 * 1024) throw new Error("That photo is too large. Choose one under 4 MB.");
+      say("Sending it to FHI…", "");
+      return fetch(ticket.url, { method: "POST", mode: "cors", credentials: "omit", headers: { "content-type": blob.type || "image/jpeg" }, body: blob });
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (j) {
+        if (!res.ok || !j.cover_photo) throw new Error(j.error || "FHI could not save the photo. Try again.");
+        return j.cover_photo;
+      });
+    }).then(function (url) {
+      var s = shown;
+      if (!s) return;
+      s.e.cover_photo = url; s.e.has_cover_photo = true; s.e.cover = "own photo";
+      if (Array.isArray(s.e.missing)) s.e.missing = s.e.missing.filter(function (m) { return m.what !== "Cover photo"; });
+      showEvent({ saved: true, changed: ["cover photo"] }, s.e, s.ui);
+      say("Your photo is now the cover.", "ok");
+      /* let Claude know, quietly: it could not see the upload */
+      if (caps && caps.updateModelContext) {
+        request("ui/update-model-context", { content: [{ type: "text", text: "The person added their own cover photo to the FHI event \u201c" + s.e.title + "\u201d from the card. It is the cover now and replaced any automatic poster." }] }).catch(function () {});
+      }
+    }).catch(function (err) {
+      btn.disabled = false;
+      var m = err && err.message ? String(err.message) : "";
+      say(/Failed to fetch|NetworkError|Load failed/i.test(m) || !m ? "The photo could not be sent from here. Use Open in dashboard to upload it." : m, "bad");
+    });
   }
 
   function rows(title, list) {
@@ -406,15 +500,17 @@ export const EVENT_CARD_HTML = String.raw`<!doctype html>
   function showResult(result) {
     card.setAttribute("data-done", "1");
     var p = null;
-    if (result && result.structuredContent && typeof result.structuredContent === "object") p = result.structuredContent;
-    else {
-      var blocks = (result && result.content) || [];
-      for (var i = 0; i < blocks.length; i++) {
-        if (blocks[i] && blocks[i].type === "text") { try { p = JSON.parse(blocks[i].text); } catch (e) { p = null; } break; }
-      }
+    var blocks = (result && result.content) || [];
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i] && blocks[i].type === "text") { try { p = JSON.parse(blocks[i].text); } catch (e) { p = null; } break; }
     }
+    /* card-only extras (the Add photo link) ride in structuredContent, which the model does not read */
+    var sc = result && result.structuredContent && typeof result.structuredContent === "object" ? result.structuredContent : null;
+    if (!p && sc && sc.event) p = sc;
+    var ui = sc && sc.ui && typeof sc.ui === "object" ? sc.ui : null;
+    shown = null;
     if (!p || typeof p !== "object") { showNote("Done. See Claude’s answer below.", false); return; }
-    if (p.event && typeof p.event === "object") { showEvent(p, p.event); return; }
+    if (p.event && typeof p.event === "object") { showEvent(p, p.event, ui); return; }
     clear();
     if (Array.isArray(p.drafts) || Array.isArray(p.upcoming_live)) {
       card.appendChild(el("h1", "", "FHI events"));
@@ -438,8 +534,9 @@ export const EVENT_CARD_HTML = String.raw`<!doctype html>
 
   /* ── start: listeners are set above, so nothing the host sends is lost ── */
   if (!host || host === window) { showNote("This card is shown inside Claude.", false); return; }
-  request("ui/initialize", { appInfo: { name: "FHI event card", version: "1.0.0" }, appCapabilities: {}, protocolVersion: PROTOCOL })
+  request("ui/initialize", { appInfo: { name: "FHI event card", version: "2.0.0" }, appCapabilities: {}, protocolVersion: PROTOCOL })
     .then(function (res) {
+      caps = (res && res.hostCapabilities) || {};
       applyContext(res && res.hostContext);
       notify("ui/notifications/initialized");
       connected = true;

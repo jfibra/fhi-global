@@ -55,7 +55,8 @@ const FONT_FILES: Array<Omit<Font, "data"> & { file: string }> = [
   { name: "Playfair Display", file: "PlayfairDisplay-400i.woff", weight: 400, style: "italic" },
 ]
 const fontCache = new Map<string, Promise<ArrayBuffer>>()
-async function loadFonts(): Promise<Font[]> {
+/** The poster fonts (Outfit + Playfair Display), fetched once per server instance — shared with lib/events/poster.tsx. */
+export async function loadFonts(): Promise<Font[]> {
   return Promise.all(
     FONT_FILES.map(async ({ file, ...meta }) => {
       const url = `${SITE_URL}/fonts/${file}`
@@ -72,7 +73,7 @@ async function loadFonts(): Promise<Font[]> {
   )
 }
 
-async function asDataUri(url: string): Promise<string | null> {
+export async function asDataUri(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, { cache: "force-cache" })
     if (!res.ok) return null
@@ -90,7 +91,7 @@ const titleSize = (t: string) => (t.length <= 16 ? 96 : t.length <= 26 ? 80 : t.
 
 /** Lucide outlines as inline SVG — satori draws SVG children (but no React fragments: "Cannot convert a Symbol value to a string"). */
 const svgProps = { width: 30, height: 30, viewBox: "0 0 24 24", fill: "none", stroke: GOLD, strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }
-const Icon = ({ kind }: { kind: "calendar" | "clock" | "pin" }) =>
+export const Icon = ({ kind }: { kind: "calendar" | "clock" | "pin" }) =>
   kind === "calendar" ? (
     <svg {...svgProps}>
       <rect x="3" y="4" width="18" height="18" rx="2" />
