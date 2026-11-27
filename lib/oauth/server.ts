@@ -3,7 +3,7 @@ import "server-only"
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import type { NextRequest } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { ROLES_ADMIN_STAFF, ROLES_AGENT_ASSISTANT, canManageEvents, isAdminStaffRole, roleInList } from "@/lib/app-roles"
+import { ROLES_ADMIN_STAFF, ROLES_AGENT_ASSISTANT, canManageEvents, canUseEventsArea, isAdminStaffRole, roleInList } from "@/lib/app-roles"
 import { SITE_URL } from "@/lib/seo"
 
 /**
@@ -24,11 +24,12 @@ import { SITE_URL } from "@/lib/seo"
 
 export const OAUTH_SCOPE = "fhi:read"
 /**
- * Create, edit and publish company events from Claude (2026-11-27,
- * lib/mcp/events.ts). The one permission that writes: offered on the consent
- * screen only to a role that manages events in the dashboard, granted only
- * when the person leaves it ticked, and stored on the grant — a connection
- * made before it existed stays reading-only until it is added again.
+ * Create, edit and publish events from Claude (2026-11-27,
+ * lib/mcp/events.ts): company events for admin staff, their OWN events for
+ * agents and team leaders. The one permission that writes: offered on the
+ * consent screen only to a role that runs events in the dashboard, granted
+ * only when the person leaves it ticked, and stored on the grant — a
+ * connection made before it existed stays reading-only until it is added again.
  */
 export const OAUTH_SCOPE_EVENTS = "fhi:events"
 export const OAUTH_SCOPES: readonly string[] = [OAUTH_SCOPE, OAUTH_SCOPE_EVENTS]
@@ -43,8 +44,12 @@ const CODE_TTL_S = 10 * 60
 export const MCP_SIGN_IN_ROLES: readonly string[] = [...ROLES_AGENT_ASSISTANT, ...ROLES_ADMIN_STAFF]
 export const mcpSignInAllowed = (role: string | null | undefined) => roleInList(role, MCP_SIGN_IN_ROLES)
 
-/** May this role be offered the events permission? The dashboard's own rule for company events. */
-export const eventsScopeAllowed = (role: string | null | undefined) => canManageEvents(role)
+/** May this role be offered the events permission? The dashboard's own rule: admin staff, and the roles that run their own events. */
+export const eventsScopeAllowed = (role: string | null | undefined) => canUseEventsArea(role)
+
+/** The box's words on the consent screen: whose events this person's Claude may write. */
+export const eventsScopeLabel = (role: string | null | undefined) =>
+  canManageEvents(role) ? "Create, change and publish company events" : "Create, change and publish your own events"
 
 /** Does a stored scope string ("fhi:read fhi:events") hold this permission? */
 export const scopeHas = (scope: string | null | undefined, one: string) => (scope ?? "").split(/\s+/).includes(one)

@@ -360,6 +360,7 @@ export const EVENT_CARD_HTML = String.raw`<!doctype html>
     }
     row("When", e.when || "No date yet", sched || (e.time_zone && e.when && e.when !== "no date yet" ? e.time_zone : ""));
     row("Venue", e.venue || "Not set yet", e.venue ? (e.has_map_pin ? "Map pin set" : "No map pin yet") : "", !!e.has_map_pin);
+    if (e.appears_on) row("Shows on", e.appears_on);
     var seats = Array.isArray(e.seats_per_day)
       ? (e.seats_per_day.length === 1 ? String(e.seats_per_day[0]) + " seats" : e.seats_per_day.map(function (v, i) { return "Day " + (i + 1) + ": " + v; }).join("  ·  "))
       : "No limit";

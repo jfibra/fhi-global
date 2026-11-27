@@ -3,6 +3,7 @@ import "server-only"
 import { McpServer, fromJsonSchema, type JsonSchemaType } from "@modelcontextprotocol/server"
 import { roleToLabel } from "@/lib/app-roles"
 import { agentChatToolsFor, runAgentChatTool, type AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
+import { eventToolNotes, registerEventTools, type EventWriter } from "@/lib/mcp/events"
 import { MCP_SERVER_NAME, MCP_SERVER_VERSION } from "@/lib/mcp/server"
 
 /**
@@ -17,6 +18,11 @@ import { MCP_SERVER_NAME, MCP_SERVER_VERSION } from "@/lib/mcp/server"
  * themselves (client message drafts, the performance report's coaching) are
  * left out; the note, reminder and goal tools are limited to their read
  * actions. Adding or changing stays in the dashboard assistant.
+ *
+ * The one exception (2026-11-27): the event tools of lib/mcp/events.ts,
+ * added only when the route hands in an `events` writer — the person ticked
+ * the events box on the consent screen and their role runs its own events.
+ * They reach ONLY the events that person owns.
  */
 
 const SKIP = new Set(["project_brochure", "project_comparison", "client_message", "my_report", "mark_lead_contacted", "member_message"])
@@ -32,14 +38,15 @@ const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: 
 
 const WRITE_REFUSED = "Claude only reads here. To add or change notes, reminders or your sales goal, use the FHI Assistant in your FHI dashboard."
 
-export function buildPersonalMcpServer(caller: AgentChatCaller): McpServer {
+export function buildPersonalMcpServer(caller: AgentChatCaller, opts: { events?: EventWriter } = {}): McpServer {
   const who = caller.name ? `${caller.name} (${roleToLabel(caller.role)})` : roleToLabel(caller.role)
   const server = new McpServer(
     { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION, title: "FHI Global" },
     {
-      instructions: `You are connected to FHI Global, a Dubai real-estate company, as ${who}. Every tool answers with this person's own FHI data (their sales, leads, listings, website, events, reviews, recruits, notes and reminders${caller.role === "team_leader" ? ", and their team" : ""}) plus what the dashboard shows everyone (the Top Sales board, projects, developers, news). Amounts are in AED. Dates are YYYY-MM-DD and to_date is exclusive. Nothing here writes to FHI.`,
+      instructions: `You are connected to FHI Global, a Dubai real-estate company, as ${who}. Every tool answers with this person's own FHI data (their sales, leads, listings, website, events, reviews, recruits, notes and reminders${caller.role === "team_leader" ? ", and their team" : ""}) plus what the dashboard shows everyone (the Top Sales board, projects, developers, news). Amounts are in AED. Dates are YYYY-MM-DD and to_date is exclusive. ${opts.events ? eventToolNotes(opts.events) : "Nothing here writes to FHI."}`,
     },
   )
+  if (opts.events) registerEventTools(server, opts.events)
   for (const t of agentChatToolsFor(caller.role)) {
     const f = t.function
     if (SKIP.has(f.name)) continue

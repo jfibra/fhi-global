@@ -39,11 +39,15 @@ type Props = {
   items: string[]
   /** A role that manages events is offered the one permission that writes (lib/oauth/server.ts OAUTH_SCOPE_EVENTS). */
   eventsOffer?: boolean
+  /** The box's words: company events for admin staff, the person's own for agents and team leaders. */
+  eventsLabel?: string
+  /** The person has the Connect Claude page in their dashboard (agents, team leaders) — where they disconnect. */
+  ownPage?: boolean
   params: Record<string, string>
   blocked: "inactive" | "role" | null
 }
 
-export function ConsentUI({ app, backHost, name, roleLabel, items, eventsOffer = false, params, blocked }: Props) {
+export function ConsentUI({ app, backHost, name, roleLabel, items, eventsOffer = false, eventsLabel = "Create, change and publish company events", ownPage = true, params, blocked }: Props) {
   const [busy, setBusy] = useState<"allow" | "deny" | null>(null)
   // Ticked by default: the person sees it, and unticking keeps the connection reading-only.
   const [events, setEvents] = useState(true)
@@ -122,7 +126,7 @@ export function ConsentUI({ app, backHost, name, roleLabel, items, eventsOffer =
                   className="mt-1 h-[18px] w-[18px] shrink-0 accent-[#001f3f]"
                 />
                 <span className="text-[14.5px] leading-relaxed text-[#1f2937]">
-                  <span className="font-semibold">Create, change and publish company events</span>
+                  <span className="font-semibold">{eventsLabel}</span>
                   <span className="mt-0.5 block text-[13.5px] text-[#4b5563]">
                     Every event starts as a draft, and it goes live only when you ask for it. Nothing can be deleted. Untick this to keep {app} reading only.
                   </span>
@@ -131,7 +135,7 @@ export function ConsentUI({ app, backHost, name, roleLabel, items, eventsOffer =
             </>
           ) : null}
           <p className="mt-4 text-[13px] leading-relaxed text-[#6b7280]">
-            {writes ? "Apart from events, nothing is written to FHI." : "Reading only — nothing is written to FHI."} You can disconnect any time{eventsOffer ? "" : " from Connect Claude in your dashboard"}, and a deactivated account is disconnected at once.
+            {writes ? "Apart from events, nothing is written to FHI." : "Reading only — nothing is written to FHI."} You can disconnect any time{ownPage ? " from Connect Claude in your dashboard" : ""}, and a deactivated account is disconnected at once.
           </p>
         </>
       )}

@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { roleToLabel } from "@/lib/app-roles"
+import { ROLES_AGENT_ASSISTANT, roleInList, roleToLabel } from "@/lib/app-roles"
 import { getProfileByUserId, isInactiveProfile } from "@/lib/auth"
-import { CONSENT_PATH, checkAuthorizeRequest, clientDisplayName, consentItems, eventsScopeAllowed, mcpSignInAllowed } from "@/lib/oauth/server"
+import { CONSENT_PATH, checkAuthorizeRequest, clientDisplayName, consentItems, eventsScopeAllowed, eventsScopeLabel, mcpSignInAllowed } from "@/lib/oauth/server"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { ConsentUI, ConsentShell } from "./consent-ui"
 
@@ -12,8 +12,9 @@ import { ConsentUI, ConsentShell } from "./consent-ui"
  * Signed out → the staff sign-in with `next` back here; signed in → "Allow
  * Claude to read your FHI data?" with what their role gets. Allow and Cancel
  * post to /api/oauth/authorize, which mints the code and hands back the
- * address to go to. A role that manages events is also offered a ticked
- * box, "Create, change and publish company events" (2026-11-27) — the only
+ * address to go to. A role that runs events is also offered a ticked box
+ * (2026-11-27) — "Create, change and publish company events" for admin
+ * staff, "…your own events" for agents and team leaders — the only
  * permission that writes.
  */
 
@@ -60,6 +61,8 @@ export default async function AuthorizePage({ searchParams }: { searchParams?: P
       roleLabel={roleToLabel(profile?.role)}
       items={consentItems(profile?.role)}
       eventsOffer={!blocked && eventsScopeAllowed(profile?.role)}
+      eventsLabel={eventsScopeLabel(profile?.role)}
+      ownPage={roleInList(profile?.role, ROLES_AGENT_ASSISTANT)}
       params={{ ...check.params, response_type: "code" }}
       blocked={blocked}
     />

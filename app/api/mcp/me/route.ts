@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createMcpHandler } from "@modelcontextprotocol/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { canManageEvents, isAdminStaffRole } from "@/lib/app-roles"
+import { canManageEvents, canManageOwnEvents, isAdminStaffRole } from "@/lib/app-roles"
 import { requestContextFromRequest } from "@/lib/audit-log"
 import { getDashboardRouteByRole, isInactiveProfile } from "@/lib/auth"
 import type { AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
@@ -22,11 +22,12 @@ import { allowRequest } from "@/lib/rate-limit"
  * rotated or disconnected), the profile active, the role one the assistant
  * serves. Agents and team leaders get the agent FHI Assistant's tools bound
  * to them (lib/mcp/personal.ts); admin staff get the admin server
- * (lib/mcp/server.ts) with the server's own key — and, when their role
- * manages events and their connection carries the events permission (the
- * ticked box on the consent screen), the event tools that write
- * (lib/mcp/events.ts). Both are re-checked on every call, so a role change
- * or a reading-only connection never reaches them.
+ * (lib/mcp/server.ts) with the server's own key. Either gets the event
+ * tools that write (lib/mcp/events.ts) when their connection carries the
+ * events permission (the ticked box on the consent screen) AND their role
+ * runs events in the dashboard: admin staff act on company events, an agent
+ * or team leader only on the events they own. Both are re-checked on every
+ * call, so a role change or a reading-only connection never reaches them.
  */
 
 export const runtime = "nodejs"
@@ -44,7 +45,7 @@ const handler = createMcpHandler(
   (ctx) => {
     const who = ctx.authInfo?.extra?.who as Who | undefined
     if (!who) throw new Error("No identity on the request")
-    return who.admin ? buildFhiMcpServer(adminAuthorization(), { events: who.events }) : buildPersonalMcpServer(who.caller)
+    return who.admin ? buildFhiMcpServer(adminAuthorization(), { events: who.events }) : buildPersonalMcpServer(who.caller, { events: who.events })
   },
   { legacy: "stateless", responseMode: "json", onerror: (e) => console.error("[mcp/me]", e.message) },
 )
@@ -85,15 +86,23 @@ async function serve(req: NextRequest) {
   void touchGrant(identity).catch(() => undefined)
 
   const admin = isAdminStaffRole(profile.role)
-  const events: EventWriter | undefined =
-    admin && canManageEvents(profile.role) && scopeHas(identity.scope, OAUTH_SCOPE_EVENTS)
-      ? {
-          actor: { id: profile.id, name: profile.fullname, role: profile.role },
-          request: requestContextFromRequest(req),
-          origin: issuer,
-          dashboard: getDashboardRouteByRole(profile.role),
-        }
-      : undefined
+  // Whose events this person may write from Claude: the dashboard's two tiers (lib/events/access.ts).
+  const eventScope: EventWriter["scope"] | null = !scopeHas(identity.scope, OAUTH_SCOPE_EVENTS)
+    ? null
+    : admin && canManageEvents(profile.role)
+      ? { kind: "all" }
+      : !admin && canManageOwnEvents(profile.role)
+        ? { kind: "own", agentId: profile.id }
+        : null
+  const events: EventWriter | undefined = eventScope
+    ? {
+        actor: { id: profile.id, name: profile.fullname, role: profile.role },
+        request: requestContextFromRequest(req),
+        origin: issuer,
+        dashboard: getDashboardRouteByRole(profile.role),
+        scope: eventScope,
+      }
+    : undefined
   const who: Who = { caller: { userId: profile.id, name: profile.fullname, role: profile.role }, admin, events }
   return handler.fetch(req, {
     authInfo: { token, clientId: identity.clientId || MCP_SERVER_NAME, scopes: identity.scope.split(/\s+/).filter(Boolean), expiresAt: identity.expiresAt, extra: { who } },

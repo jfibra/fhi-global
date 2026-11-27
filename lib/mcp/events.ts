@@ -4,22 +4,34 @@ import type { McpServer } from "@modelcontextprotocol/server"
 import { z } from "zod"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import type { AuditActor, AuditRequestContext } from "@/lib/audit-log"
+import { agentWebsite, placementIssue, type EventScope } from "@/lib/events/access"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
 import { CERTIFICATE_DEFAULTS } from "@/lib/events/certificate"
 import { MAX_EVENT_DAYS, dubaiHHMM, dubaiYMD, eventIsPast, eventSchedule, eventWhenLabel, normalizeEventDays } from "@/lib/events/dates"
 import { MAX_DAY_PAX, normalizeDayPax } from "@/lib/events/pax"
+import { eventPublicPath } from "@/lib/events/paths"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { createEvent, updateEvent, type EventWriteMeta } from "@/lib/events/write"
 import { EVENT_CARD_TOOL_META, registerEventCard } from "@/lib/mcp/event-card"
 
 /**
- * Claude's event tools (2026-11-27, boss's idea via Juliecor): an admin
- * makes a COMPANY event by talking to Claude. The only tools on FHI's MCP
- * server that write. Registered by buildFhiMcpServer() ONLY on the signed-in
- * endpoint (POST /api/mcp/me), ONLY for a role that manages events in the
- * dashboard, and ONLY when the person ticked "Create, change and publish
- * company events" on the consent screen (scope fhi:events on the grant).
- * The keyed endpoint (/api/mcp) never gets them: it has no person behind it.
+ * Claude's event tools (2026-11-27, boss's idea via Juliecor): a person
+ * makes an event by talking to Claude. The only tools on FHI's MCP server
+ * that write. Registered ONLY on the signed-in endpoint (POST /api/mcp/me),
+ * ONLY for a role that runs events in the dashboard, and ONLY when the
+ * person ticked the events box on the consent screen (scope fhi:events on
+ * the grant). The keyed endpoint (/api/mcp) never gets them: it has no
+ * person behind it.
+ *
+ * Whose events — the dashboard's own two tiers (lib/events/access.ts):
+ *   · admin staff (scope "all", buildFhiMcpServer) → COMPANY events. An
+ *     agent's own event can be read and copied from, never changed.
+ *   · agents and team leaders (scope "own", buildPersonalMcpServer) → ONLY
+ *     the events they own: every lookup is pinned to their id, so another
+ *     person's event answers "no event matches", as if it did not exist.
+ *     They choose where it appears (`where`: fhiglobal.ae/events, their FHI
+ *     website, or both — placementIssue is the rule, a website is needed
+ *     only to show it there).
  *
  *   fhi_event_create   a draft — from what the person said, or copied from a
  *                      past event (photo, venue + map pin, sign-up fields,
@@ -40,8 +52,8 @@ import { EVENT_CARD_TOOL_META, registerEventCard } from "@/lib/mcp/event-card"
  *   · the same title at the same date and time returns the event that is
  *     already there instead of making a second one;
  *   · CLAUDE_EVENTS_DAILY_LIMIT (20) new events per person per 24 hours;
- *   · company events only, and nothing is ever deleted. An agent's own
- *     event, registrations, certificates and emails stay in the dashboard.
+ *   · nothing is ever deleted; registrations, certificates and emails stay
+ *     in the dashboard.
  *   · a map pin is never made from typed text (the Maps rule): it comes only
  *     with a venue reused from an event whose pin was picked in the dashboard.
  *
@@ -51,14 +63,21 @@ import { EVENT_CARD_TOOL_META, registerEventCard } from "@/lib/mcp/event-card"
  */
 
 export type EventWriter = {
-  /** The signed-in admin every write is logged under. */
+  /** The signed-in person every write is logged under. */
   actor: AuditActor
   request: Partial<AuditRequestContext>
   /** Where links point: the site in production, this server in dev. */
   origin: string
-  /** The person's dashboard base, e.g. "/admin". */
+  /** The person's dashboard base, e.g. "/admin" or "/agent". */
   dashboard: string
+  /** "all" = admin staff, acting on company events; "own" = a Website Builder role, only the events they own. */
+  scope: EventScope
+  /** The owner's Website Builder site, read once per call by run() — never set by the caller. */
+  site?: { slug: string; isPublished: boolean } | null
 }
+
+/** The profile id an "own" writer is pinned to; null for admin staff. */
+const ownerOf = (w: EventWriter) => (w.scope.kind === "own" ? w.scope.agentId : null)
 
 export const EVENT_TOOL_NAMES = ["fhi_event_create", "fhi_event_update", "fhi_event_publish", "fhi_event_check"] as const
 
@@ -67,7 +86,7 @@ const DAILY_LIMIT = Math.max(1, Number(process.env.CLAUDE_EVENTS_DAILY_LIMIT) ||
 /* ───────────────────────── rows ───────────────────────── */
 
 const ROW =
-  "id, slug, agent_id, title, description, brand, image_url, video_url, venue, venue_lat, venue_lng, venue_place_id, status, event_date, event_days, day_times, day_pax, registration_open, registration_fields, certificate, created_at"
+  "id, slug, agent_id, title, description, brand, image_url, video_url, venue, venue_lat, venue_lng, venue_place_id, status, event_date, event_days, day_times, day_pax, registration_open, registration_fields, certificate, show_on_main, show_on_website, created_at"
 
 type Row = {
   id: string
@@ -90,6 +109,8 @@ type Row = {
   registration_open: boolean | null
   registration_fields: unknown
   certificate: unknown
+  show_on_main: boolean | null
+  show_on_website: boolean | null
   created_at: string
 }
 
@@ -109,15 +130,34 @@ const pinOf = (r: Row) => (r.venue_lat != null && r.venue_lng != null ? { lat: r
 const statusOf = (r: Row) => r.status ?? "draft"
 
 const editUrl = (r: Row, w: EventWriter) => `${w.origin}${w.dashboard}/events?event=${r.id}`
-const publicUrl = (r: Row, w: EventWriter) => `${w.origin}/events/${r.slug ?? r.id}`
+/**
+ * Where the event's page is: /events/<slug> for a company event and for an
+ * agent's event listed on fhiglobal.ae; an agent's website-only event lives
+ * on their site (lib/events/paths.ts — the same choice the dashboard makes).
+ */
+function publicUrl(r: Row, w: EventWriter): string {
+  const main = `/events/${r.slug ?? r.id}`
+  if (!r.agent_id || r.show_on_main === true) return `${w.origin}${main}`
+  const site = r.agent_id === ownerOf(w) ? w.site : null
+  return `${w.origin}${eventPublicPath(r, r.show_on_website !== false && site?.isPublished ? site.slug : null)}`
+}
+
+/** For an agent's event: where it is listed, in words. */
+function appearsOn(r: Row): string | null {
+  if (!r.agent_id) return null
+  const main = r.show_on_main === true
+  const site = r.show_on_website !== false
+  return main && site ? "fhiglobal.ae/events and your FHI website" : main ? "fhiglobal.ae/events" : site ? "your FHI website" : "nowhere yet"
+}
 
 /**
  * Events a reference points at: an id, a slug or page link, or words from
  * the title (all of them must appear). Newest date first, so "the last
  * orientation" is the first row.
  */
-async function findEvents(ref: string): Promise<Row[]> {
+async function findEvents(ref: string, w: EventWriter, companyOnly = false): Promise<Row[]> {
   const admin = createAdminSupabase()
+  const owner = ownerOf(w)
   let q = ref.trim()
   if (!q) return []
   // A pasted link: the last path segment is the slug (or the id in ?event=).
@@ -130,15 +170,24 @@ async function findEvents(ref: string): Promise<Row[]> {
     }
   }
   if (UUID_RE.test(q)) {
-    const { data, error } = await admin.from("events").select(ROW).eq("id", q).is("deleted_at", null).maybeSingle<Row>()
+    let byId = admin.from("events").select(ROW).eq("id", q).is("deleted_at", null)
+    if (owner) byId = byId.eq("agent_id", owner)
+    else if (companyOnly) byId = byId.is("agent_id", null)
+    const { data, error } = await byId.maybeSingle<Row>()
     if (error) throw new Error(error.message)
     return data ? [data] : []
   }
   if (/^[a-z0-9-]+$/.test(q)) {
-    const { data } = await admin.from("events").select(ROW).eq("slug", q).is("deleted_at", null).maybeSingle<Row>()
+    let bySlug = admin.from("events").select(ROW).eq("slug", q).is("deleted_at", null)
+    if (owner) bySlug = bySlug.eq("agent_id", owner)
+    else if (companyOnly) bySlug = bySlug.is("agent_id", null)
+    const { data } = await bySlug.maybeSingle<Row>()
     if (data) return [data]
   }
   let query = admin.from("events").select(ROW).is("deleted_at", null)
+  // An "own" writer sees only their events — here, so no tool can reach another person's by any reference.
+  if (owner) query = query.eq("agent_id", owner)
+  else if (companyOnly) query = query.is("agent_id", null)
   for (const word of q.split(/\s+/).filter(Boolean).slice(0, 8)) query = query.ilike("title", `%${literal(word)}%`)
   const { data, error } = await query.order("event_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).limit(8)
   if (error) throw new Error(error.message)
@@ -153,27 +202,37 @@ const brief = (r: Row) => ({
   host: r.agent_id ? "an agent's own event" : "company event",
 })
 
+const listHint = (w: EventWriter) => (ownerOf(w) ? "Call fhi_event_check with no event to list your events, then use the id." : "Call fhi_event_check with no event to list the drafts and upcoming events, then use the id.")
+
 /** The event to copy something FROM — the most recent match; the others are named so Claude can say which it took. */
-async function source(ref: string, what: string): Promise<{ row: Row; others: ReturnType<typeof brief>[] }> {
-  const found = await findEvents(ref)
+async function source(ref: string, what: string, w: EventWriter): Promise<{ row: Row; others: ReturnType<typeof brief>[] }> {
+  const found = await findEvents(ref, w)
   if (!found.length) {
-    throw new Problem({ saved: false, problem: `No event matches "${ref}" to take the ${what} from.`, do: "Ask the person which event they mean, or call fhi_events (status all) to look for it." })
+    throw new Problem({
+      saved: false,
+      problem: ownerOf(w) ? `None of your events matches "${ref}" to take the ${what} from.` : `No event matches "${ref}" to take the ${what} from.`,
+      do: ownerOf(w) ? "Only your own events can be copied from. Ask the person which of their events they mean, or call fhi_event_check with no event to list them." : "Ask the person which event they mean, or call fhi_events (status all) to look for it.",
+    })
   }
   return { row: found[0], others: found.slice(1, 4).map(brief) }
 }
 
-/** The ONE event a write acts on: a company event, unambiguous. */
+/** The ONE event a write acts on, unambiguous: a company event for admin staff, one of their own for an owner. */
 async function target(ref: string, w: EventWriter): Promise<Row> {
-  const found = await findEvents(ref)
+  // Admin staff write company events only, so the reference is looked up among those first: an agent's
+  // event with the same words in its title must not make it ambiguous. Only when no company event
+  // matches is the wider search made, to say "that one is an agent's own event".
+  let found = await findEvents(ref, w, !ownerOf(w))
+  if (!found.length && !ownerOf(w)) found = await findEvents(ref, w)
   if (!found.length) {
-    throw new Problem({ saved: false, problem: `No event matches "${ref}".`, do: "Call fhi_event_check with no event to list the drafts and upcoming events, then use the id." })
+    throw new Problem({ saved: false, problem: ownerOf(w) ? `None of your events matches "${ref}".` : `No event matches "${ref}".`, do: listHint(w) })
   }
   const exact = found.filter((r) => r.title.trim().toLowerCase() === ref.trim().toLowerCase())
   const row = found.length === 1 ? found[0] : exact.length === 1 ? exact[0] : null
   if (!row) {
     throw new Problem({ saved: false, problem: `"${ref}" matches ${found.length} events.`, which: found.map(brief), do: "Ask the person which one, then call again with its id." })
   }
-  if (row.agent_id) {
+  if (!ownerOf(w) && row.agent_id) {
     throw new Problem({
       saved: false,
       problem: `"${row.title}" is an agent's own event. From Claude only company events are created or changed.`,
@@ -235,6 +294,7 @@ function describe(r: Row, w: EventWriter) {
     description: r.description ?? null,
     brand: eventBrand(r.brand).name,
     registration_open: r.registration_open !== false,
+    ...(appearsOn(r) ? { appears_on: appearsOn(r) } : {}),
     open_in_dashboard: editUrl(r, w),
     public_page: status === "published" ? publicUrl(r, w) : `${publicUrl(r, w)} (works once it is published)`,
     ready_to_publish: status !== "published" && !missing.some((m) => m.needed_to_publish),
@@ -297,6 +357,7 @@ const FIELDS = {
 }
 
 type FieldArgs = {
+  where?: "fhiglobal" | "website" | "both"
   title?: string
   date?: string
   start_time?: string
@@ -342,10 +403,22 @@ async function create(a: FieldArgs & { copy_from?: string }, w: EventWriter) {
   const meta: EventWriteMeta = { actor: w.actor, source: "claude", request: w.request }
   const notes: string[] = []
 
-  const copy = a.copy_from ? await source(a.copy_from, "details") : null
-  const venueSrc = a.venue_from ? await source(a.venue_from, "venue") : null
-  const photoSrc = a.photo_from ? await source(a.photo_from, "cover photo") : null
+  const copy = a.copy_from ? await source(a.copy_from, "details", w) : null
+  const venueSrc = a.venue_from ? await source(a.venue_from, "venue", w) : null
+  const photoSrc = a.photo_from ? await source(a.photo_from, "cover photo", w) : null
   const from = copy?.row ?? null
+
+  // An owner's event has to appear somewhere: fhiglobal.ae/events, their website, or both (the dashboard's rule and default).
+  const ownerId = ownerOf(w)
+  const site = ownerId ? (w.site ?? null) : null
+  let placement: { show_on_main?: boolean; show_on_website?: boolean } = {}
+  if (ownerId) {
+    const onMain = a.where ? a.where !== "website" : from ? from.show_on_main === true || !site : true
+    const onWebsite = a.where ? a.where !== "fhiglobal" : from ? from.show_on_website !== false && Boolean(site) : Boolean(site)
+    const issue = placementIssue(onMain, onWebsite, Boolean(site))
+    if (issue) throw new Problem({ saved: false, problem: issue.error, do: "Tell the person, and ask where the event should appear. Nothing was saved." })
+    placement = { show_on_main: onMain, show_on_website: onWebsite }
+  }
 
   const title = (a.title ?? from?.title ?? "").trim()
   const time = a.start_time ?? (from?.event_date ? dubaiHHMM(new Date(from.event_date)) : undefined)
@@ -401,19 +474,14 @@ async function create(a: FieldArgs & { copy_from?: string }, w: EventWriter) {
     venue_lat: pin?.lat ?? null,
     venue_lng: pin?.lng ?? null,
     venue_place_id: pin?.placeId ?? null,
+    ...placement,
   })
   if (a.video_url && !input.video_url) notes.push("The video link is not one the website can play, so it was left out.")
 
   // The same title at the same moment is the same event: answer with it instead of making a second one.
-  const { data: twin } = await admin
-    .from("events")
-    .select(ROW)
-    .is("deleted_at", null)
-    .is("agent_id", null)
-    .eq("event_date", eventDate)
-    .ilike("title", literal(input.title))
-    .limit(1)
-    .maybeSingle<Row>()
+  let twins = admin.from("events").select(ROW).is("deleted_at", null).eq("event_date", eventDate).ilike("title", literal(input.title))
+  twins = ownerId ? twins.eq("agent_id", ownerId) : twins.is("agent_id", null)
+  const { data: twin } = await twins.limit(1).maybeSingle<Row>()
   if (twin) {
     return { saved: false, already_existed: true, say: "An event with this title at this date and time is already there, so no second one was made. Tell the person, and show what it still needs.", event: describe(twin, w) }
   }
@@ -432,7 +500,7 @@ async function create(a: FieldArgs & { copy_from?: string }, w: EventWriter) {
     throw new Problem({ saved: false, problem: `${DAILY_LIMIT} events were already created from Claude in the last 24 hours, which is the limit.`, do: "Create this one in the dashboard, or try again tomorrow." })
   }
 
-  const made = await createEvent(admin, { input, ownerId: null, site: null, meta })
+  const made = await createEvent(admin, { input, ownerId, site, meta })
   if (!made.ok) throw new Error(made.error)
   const row = await rowById(made.id)
   return {
@@ -457,10 +525,10 @@ async function update(a: FieldArgs & { event: string }, w: EventWriter) {
     })
   }
   const notes: string[] = []
-  const venueSrc = a.venue_from ? await source(a.venue_from, "venue") : null
-  const photoSrc = a.photo_from ? await source(a.photo_from, "cover photo") : null
+  const venueSrc = a.venue_from ? await source(a.venue_from, "venue", w) : null
+  const photoSrc = a.photo_from ? await source(a.photo_from, "cover photo", w) : null
 
-  const given = (["title", "date", "start_time", "days", "day_times", "seats", "seats_per_day", "venue", "description", "brand", "video_url", "registration_open", "venue_from", "photo_from"] as const).filter((k) => a[k] !== undefined)
+  const given = (["title", "date", "start_time", "days", "day_times", "seats", "seats_per_day", "venue", "description", "brand", "video_url", "registration_open", "venue_from", "photo_from", "where"] as const).filter((k) => a[k] !== undefined)
   if (!given.length) throw new Problem({ saved: false, problem: "No change was given.", do: "Send the fields to change." })
 
   // The dashboard's whole payload, from the saved row, with the changes on top.
@@ -524,12 +592,20 @@ async function update(a: FieldArgs & { event: string }, w: EventWriter) {
     body.image_url = photoSrc.row.image_url
   }
   if (a.video_url !== undefined) body.video_url = a.video_url
+  if (a.where && ownerOf(w)) {
+    body.show_on_main = a.where !== "website"
+    body.show_on_website = a.where !== "fhiglobal"
+  }
 
   const input = sanitizeEventInput(body)
   if (a.video_url && !input.video_url) notes.push("The video link is not one the website can play, so it was left out.")
 
-  const saved = await updateEvent(admin, { id: row.id, input, scope: { kind: "all" }, meta: { actor: w.actor, source: "claude", request: w.request } })
-  if (!saved.ok) throw new Error(saved.error)
+  const saved = await updateEvent(admin, { id: row.id, input, scope: w.scope, meta: { actor: w.actor, source: "claude", request: w.request } })
+  if (!saved.ok) {
+    // A placement the rule refuses (no website to show it on) is the person's to fix, so it is said as it is.
+    if (saved.code) throw new Problem({ saved: false, problem: saved.error, do: "Tell the person. Nothing was changed." })
+    throw new Error(saved.error)
+  }
   const changed = [...new Set(saved.changedKeys.map((k) => FIELD_WORDS[k] ?? k))]
   return {
     saved: true,
@@ -575,7 +651,7 @@ async function publish(a: { event: string; action: "publish" | "unpublish" }, w:
     status: going,
     registration_open: row.registration_open !== false,
   })
-  const saved = await updateEvent(admin, { id: row.id, input, scope: { kind: "all" }, meta: { actor: w.actor, source: "claude", request: w.request } })
+  const saved = await updateEvent(admin, { id: row.id, input, scope: w.scope, meta: { actor: w.actor, source: "claude", request: w.request } })
   if (!saved.ok) throw new Error(saved.error)
   const after = await rowById(row.id)
 
@@ -602,15 +678,18 @@ async function publish(a: { event: string; action: "publish" | "unpublish" }, w:
 
 async function check(a: { event?: string }, w: EventWriter) {
   if (a.event?.trim()) {
-    const found = await findEvents(a.event)
-    if (!found.length) throw new Problem({ problem: `No event matches "${a.event}".`, do: "Call fhi_event_check with no event to list the drafts and upcoming events." })
+    const found = await findEvents(a.event, w)
+    if (!found.length) throw new Problem({ problem: ownerOf(w) ? `None of your events matches "${a.event}".` : `No event matches "${a.event}".`, do: listHint(w) })
     if (found.length > 1 && !found.some((r) => r.title.trim().toLowerCase() === a.event?.trim().toLowerCase())) {
       return { matches: found.length, which: found.map(brief), say: "Several events match. Ask the person which one, or use an id." }
     }
     const row = found.find((r) => r.title.trim().toLowerCase() === a.event?.trim().toLowerCase()) ?? found[0]
-    return { event: describe(row, w), ...(row.agent_id ? { note: "This is an agent's own event: it can be read here, and is changed only in the dashboard." } : {}) }
+    return { event: describe(row, w), ...(row.agent_id && !ownerOf(w) ? { note: "This is an agent's own event: it can be read here, and is changed only in the dashboard." } : {}) }
   }
-  const { data, error } = await createAdminSupabase().from("events").select(ROW).is("deleted_at", null).is("agent_id", null).order("created_at", { ascending: false }).limit(200)
+  const owner = ownerOf(w)
+  let mine = createAdminSupabase().from("events").select(ROW).is("deleted_at", null)
+  mine = owner ? mine.eq("agent_id", owner) : mine.is("agent_id", null)
+  const { data, error } = await mine.order("created_at", { ascending: false }).limit(200)
   if (error) throw new Error(error.message)
   const rows = ((data ?? []) as Row[]).filter((r) => statusOf(r) === "draft" || (statusOf(r) === "published" && !eventIsPast(r.event_date, r.event_days, Date.now(), r.day_times)))
   const at = (r: Row) => (r.event_date ? new Date(r.event_date).getTime() : 0)
@@ -621,29 +700,52 @@ async function check(a: { event?: string }, w: EventWriter) {
   return {
     drafts: rows.filter((r) => statusOf(r) === "draft").sort((x, y) => at(x) - at(y)).slice(0, 25).map(line),
     upcoming_live: rows.filter((r) => statusOf(r) === "published").sort((x, y) => at(x) - at(y)).slice(0, 25).map(line),
-    say: "Company events only. Past events: fhi_events with when past.",
+    say: owner ? "Your own events only. Past ones: fhi_my_events." : "Company events only. Past events: fhi_events with when past.",
   }
 }
 
 /* ───────────────────────── registration ───────────────────────── */
 
-/** What the server tells Claude about these tools — appended to the admin server's instructions. */
+/**
+ * What the server tells Claude about these tools. For admin staff it is the
+ * whole instruction text (lib/mcp/server.ts); for an agent or team leader
+ * `eventToolNotes` is appended to the personal server's own (lib/mcp/personal.ts).
+ */
 export function eventToolInstructions(w: EventWriter): string {
   return [
     `You are connected to FHI Global, a Dubai real-estate company, as ${w.actor.name ?? "an admin"} (admin staff). Besides reading, you can create, change and publish COMPANY EVENTS with fhi_event_create, fhi_event_update, fhi_event_publish and fhi_event_check.`,
+    ...eventToolRules(w),
+  ].join(" ")
+}
+
+/** The same rules for a person who runs their OWN events (agents, team leaders). */
+export function eventToolNotes(w: EventWriter): string {
+  return [
+    "You can also create, change and publish this person's OWN events with fhi_event_create, fhi_event_update, fhi_event_publish and fhi_event_check. They reach only the events this person owns; nothing else here writes to FHI.",
+    "An own event appears on fhiglobal.ae/events, on the person's FHI website, or both (`where`). When they did not say, it goes on both if they have a website and on fhiglobal.ae otherwise: tell them where it will appear.",
+    ...eventToolRules(w),
+  ].join(" ")
+}
+
+function eventToolRules(w: EventWriter): string[] {
+  return [
     `All event times are Dubai time (GST, UTC+4). Today in Dubai is ${dubaiYMD(new Date())}. Work out every date in full, including the year; when the person did not make the date or the time clear, ask instead of guessing.`,
     "Before you create an event, tell the person the title, date, time and venue you are about to save. When they paste a message or a poster, read the details from it and confirm them the same way.",
     "A new event is always a draft and is not public. After every save the tool lists what is still missing and how to fix each item: tell the person, and offer to fill what you can (write the description yourself from their notes). When they say an event is like a past one, use copy_from so the photo, the venue with its map pin, the sign-up fields and the certificate design come along.",
-    "Publish only when the person asks for it. Nothing can be deleted from here. Agents' own events, registrations, certificates and emails are handled in the FHI dashboard: give the open_in_dashboard link.",
+    ownerOf(w)
+      ? "Publish only when the person asks for it. Nothing can be deleted from here. Registrations, certificates and emails are handled in the FHI dashboard: give the open_in_dashboard link."
+      : "Publish only when the person asks for it. Nothing can be deleted from here. Agents' own events, registrations, certificates and emails are handled in the FHI dashboard: give the open_in_dashboard link.",
     "Each event tool also shows the person a card in the chat with the event's photo, date, venue, seats, status, what is missing and an Open in dashboard button. Do not repeat the card field by field: say in a sentence or two what happened and what the next step is.",
-  ].join(" ")
+  ]
 }
 
 type ToolResult = ReturnType<typeof reply>
 
 /** Runs a tool body; a Problem becomes its payload, anything else a plain apology (and a server log). */
-async function run(name: string, body: () => Promise<unknown>): Promise<ToolResult> {
+async function run(name: string, w: EventWriter, body: () => Promise<unknown>): Promise<ToolResult> {
   try {
+    const owner = ownerOf(w)
+    if (owner && w.site === undefined) w.site = await agentWebsite(createAdminSupabase(), owner)
     return reply(await body())
   } catch (e) {
     if (e instanceof Problem) return reply(e.payload, true)
@@ -655,39 +757,50 @@ async function run(name: string, body: () => Promise<unknown>): Promise<ToolResu
 export function registerEventTools(server: McpServer, w: EventWriter): void {
   // The card Claude shows with each answer; every tool below points at it.
   registerEventCard(server)
+  const own = Boolean(ownerOf(w))
+  // Whose event, in the words the tool descriptions use.
+  const an = own ? "one of the person's OWN events" : "a COMPANY event"
+  const sources = own ? "one of the person's own past events" : "a past event"
+  // Only an owner chooses where the event appears; a company event is always on fhiglobal.ae/events.
+  const fields = own
+    ? {
+        ...FIELDS,
+        where: z
+          .enum(["fhiglobal", "website", "both"])
+          .optional()
+          .describe("Where it appears: fhiglobal = fhiglobal.ae/events, website = the person's own FHI website (they need one), both. When not said: both if they have a website, else fhiglobal."),
+      }
+    : FIELDS
   server.registerTool(
     "fhi_event_create",
     {
       title: "FHI · create an event (draft)",
-      description:
-        "Create a COMPANY event on fhiglobal.ae as a DRAFT (never public). Needs a title, a date and a start time: when one is missing nothing is saved and the answer says what to ask. With copy_from, everything the past event had comes along (description, brand, cover photo, venue with its map pin, sign-up fields, certificate design, days, seats and start time) and the fields you send replace it — the date is always new. Answers with the saved event, the dashboard link, and what is still missing with how to fix each item.",
+      description: `Create ${an} as a DRAFT (never public). Needs a title, a date and a start time: when one is missing nothing is saved and the answer says what to ask. With copy_from, everything ${sources} had comes along (description, brand, cover photo, venue with its map pin, sign-up fields, certificate design, days, seats and start time) and the fields you send replace it — the date is always new. Answers with the saved event, the dashboard link, and what is still missing with how to fix each item.`,
       inputSchema: z.object({
-        ...FIELDS,
-        copy_from: REF.optional().describe("Make it like a past event: its id, or words from its title (the most recent match is taken and named in the answer)"),
+        ...fields,
+        copy_from: REF.optional().describe(`Make it like ${sources}: its id, or words from its title (the most recent match is taken and named in the answer)`),
       }),
       annotations: WRITES,
       _meta: EVENT_CARD_TOOL_META,
     },
-    async (args) => run("create", () => create(args as FieldArgs & { copy_from?: string }, w)),
+    async (args) => run("create", w, () => create(args as FieldArgs & { copy_from?: string }, w)),
   )
   server.registerTool(
     "fhi_event_update",
     {
       title: "FHI · change a draft event",
-      description:
-        "Change a company event that is still a DRAFT: send only the fields that change. A live event is refused (take it back to draft first, or use the dashboard). Changing the venue's text removes its old map pin; venue_from brings a venue with its pin. Answers with what changed and what is still missing.",
-      inputSchema: z.object({ event: REF.describe("The event: its id (best), or its exact title / words from it"), ...FIELDS }),
+      description: `Change ${an} that is still a DRAFT: send only the fields that change. A live event is refused (take it back to draft first, or use the dashboard). Changing the venue's text removes its old map pin; venue_from brings a venue with its pin. Answers with what changed and what is still missing.`,
+      inputSchema: z.object({ event: REF.describe("The event: its id (best), or its exact title / words from it"), ...fields }),
       annotations: CHANGES,
       _meta: EVENT_CARD_TOOL_META,
     },
-    async (args) => run("update", () => update(args as FieldArgs & { event: string }, w)),
+    async (args) => run("update", w, () => update(args as FieldArgs & { event: string }, w)),
   )
   server.registerTool(
     "fhi_event_publish",
     {
       title: "FHI · publish or unpublish an event",
-      description:
-        'action "publish" puts a draft company event LIVE on fhiglobal.ae/events — only when the person asked for it. It is refused, with the list of what is missing, unless the event has an upcoming date, a venue and a description. action "unpublish" takes a live event back to draft: the page is hidden, registrations are kept.',
+      description: `action "publish" puts a draft of ${an} LIVE ${own ? "where it was set to appear (fhiglobal.ae/events, their FHI website, or both)" : "on fhiglobal.ae/events"} — only when the person asked for it. It is refused, with the list of what is missing, unless the event has an upcoming date, a venue and a description. action "unpublish" takes a live event back to draft: the page is hidden, registrations are kept.`,
       inputSchema: z.object({
         event: REF.describe("The event: its id (best), or its exact title / words from it"),
         action: z.enum(["publish", "unpublish"]),
@@ -695,18 +808,19 @@ export function registerEventTools(server: McpServer, w: EventWriter): void {
       annotations: CHANGES,
       _meta: EVENT_CARD_TOOL_META,
     },
-    async (args) => run("publish", () => publish(args as { event: string; action: "publish" | "unpublish" }, w)),
+    async (args) => run("publish", w, () => publish(args as { event: string; action: "publish" | "unpublish" }, w)),
   )
   server.registerTool(
     "fhi_event_check",
     {
       title: "FHI · check an event",
-      description:
-        "Read one event as the dashboard has it — any status, drafts included — with what it still needs before it can go live. Without `event`: the company's drafts and upcoming live events.",
+      description: own
+        ? "Read one of the person's own events as the dashboard has it — any status, drafts included — with what it still needs before it can go live. Without `event`: their drafts and upcoming live events."
+        : "Read one event as the dashboard has it — any status, drafts included — with what it still needs before it can go live. Without `event`: the company's drafts and upcoming live events.",
       inputSchema: z.object({ event: REF.optional().describe("An id, a page link, or words from the title. Leave out to list drafts and upcoming events.") }),
       annotations: READS,
       _meta: EVENT_CARD_TOOL_META,
     },
-    async (args) => run("check", () => check(args as { event?: string }, w)),
+    async (args) => run("check", w, () => check(args as { event?: string }, w)),
   )
 }
