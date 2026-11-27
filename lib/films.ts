@@ -36,20 +36,25 @@ export const filmKey = (url: string) => `${FILM_PREFIX}/${url.split("/").pop() ?
 export const ASSISTANT_TEASER = film("fhi-assistant-teaser", "fhi-assistant-teaser", "FHI Assistant — the 90-second tour", "1:30")
 
 /**
- * Connect Claude, step by step (boss via Juliecor, 2026-11-24): a real screen recording of the whole set-up — FHI's
- * Connect Claude page, claude.ai's connector form, the FHI sign-in and Allow, the first question — with the step names
- * as captions, a natural voice (Kokoro, an open model run locally) and soft music. Played on the Connect
- * Claude page (features/dashboard/connect-claude), whose chapter list seeks to CONNECT_CLAUDE_CHAPTERS. Re-record when
- * claude.ai's screens change, and bump the version (files are cached for a year, so a new cut gets a new version).
+ * Connect Claude, step by step (boss via Juliecor, 2026-11-24; v5 2026-11-27): steps 1–4 are a real screen
+ * recording (FHI's Connect Claude page, claude.ai's connector form, the first question), private parts blurred; the
+ * Allow screen with the events box and step 5, "Create an event by talking", are animated from the real screens —
+ * typing, clicking, the card loading with the poster FHI draws, publishing, the link dialog and the event page —
+ * following the owner's own screen recording of a real run. Every frame is drawn in headless Chrome with sub-pixel
+ * camera moves (v4's ffmpeg zoom shook). Step names as captions, a natural voice (Kokoro, an open model run
+ * locally) and soft music. Played on the Connect Claude page (features/dashboard/connect-claude), whose chapter list
+ * seeks to CONNECT_CLAUDE_CHAPTERS. Re-edit when claude.ai's screens change, and bump the version (files are
+ * cached for a year, so a new cut gets a new version).
  */
-export const CONNECT_CLAUDE_TUTORIAL = film("fhi-connect-claude", "fhi-connect-claude", "Connect Claude, step by step", "1:09", 16 / 9, "v3")
+export const CONNECT_CLAUDE_TUTORIAL = film("fhi-connect-claude", "fhi-connect-claude", "Connect Claude, step by step", "1:55", 16 / 9, "v5")
 
-/** Where each step starts in the tutorial, in seconds (printed by the edit, 2026-11-24). */
+/** Where each step starts in the tutorial, in seconds (printed by the edit, 2026-11-27). */
 export const CONNECT_CLAUDE_CHAPTERS: ReadonlyArray<{ at: number; label: string }> = [
-  { at: 7, label: "Copy the FHI address" },
-  { at: 17, label: "Add the connector in Claude" },
-  { at: 37, label: "Sign in to FHI and press Allow" },
-  { at: 53, label: "Connected: ask your first question" },
+  { at: 10, label: "Copy the FHI address" },
+  { at: 20, label: "Add the connector in Claude" },
+  { at: 40, label: "Sign in to FHI and press Allow" },
+  { at: 59, label: "Connected: ask your first question" },
+  { at: 69, label: "Create an event by talking" },
 ]
 
 /** The company films: the AVP and the Dubai event. */

@@ -837,7 +837,8 @@ export function eventToolNotes(w: EventWriter): string {
 function eventToolRules(w: EventWriter): string[] {
   return [
     `All event times are Dubai time (GST, UTC+4). Today in Dubai is ${dubaiYMD(new Date())}. Work out every date in full, including the year; when the person did not make the date or the time clear, ask instead of guessing.`,
-    "Before you create an event, tell the person the title, date, time and venue you are about to save. When they paste a message or a poster, read the details from it and confirm them the same way.",
+    // 2026-11-27, from the owner's first real run: Claude asked "shall I create it?" and "FHI or Google Calendar?" before doing anything.
+    "When the person asks to create an event and has given its name, date and start time, call fhi_event_create straight away. Do not ask them to confirm first, and do not ask which app to use: here an event is an FHI event (an open house, a seminar, a property talk, a roadshow, an orientation) on fhiglobal.ae, never a calendar entry. It is only saved as a draft, the card shows them what was saved, and anything can be changed afterwards. Ask a question only when the name, the date or the start time is missing or unclear, for example the year. When they paste a message or a poster, read the details from it, create the event the same way, and say what you read.",
     "A new event is always a draft and is not public. After every save the tool lists what is still missing and how to fix each item: tell the person, and offer to fill what you can (write the description yourself from their notes). When they say an event is like a past one, use copy_from so the photo, the venue with its map pin, the sign-up fields and the certificate design come along.",
     ownerOf(w)
       ? "Publish only when the person asks for it. Nothing can be deleted from here. Registrations, certificates and emails are handled in the FHI dashboard: give the open_in_dashboard link."
@@ -896,7 +897,7 @@ export function registerEventTools(server: McpServer, w: EventWriter): void {
     "fhi_event_create",
     {
       title: "FHI · create an event (draft)",
-      description: `Create ${an} as a DRAFT (never public). Needs a title, a date and a start time: when one is missing nothing is saved and the answer says what to ask. With copy_from, everything ${sources} had comes along (description, brand, cover photo, venue with its map pin, sign-up fields, certificate design, days, seats and start time) and the fields you send replace it — the date is always new. Answers with the saved event, the dashboard link, and what is still missing with how to fix each item.`,
+      description: `Create ${an} as a DRAFT (never public). This is the tool for any "create an event" request about an FHI event — an open house, a seminar, a property talk, a roadshow, an orientation: call it directly once the title, the date and the start time are known, without asking the person to confirm first or which app to use (it is not a calendar entry, and a draft can be changed afterwards). Needs a title, a date and a start time: when one is missing nothing is saved and the answer says what to ask. With copy_from, everything ${sources} had comes along (description, brand, cover photo, venue with its map pin, sign-up fields, certificate design, days, seats and start time) and the fields you send replace it — the date is always new. Answers with the saved event, the dashboard link, and what is still missing with how to fix each item.`,
       inputSchema: z.object({
         ...fields,
         copy_from: REF.optional().describe(`Make it like ${sources}: its id, or words from its title (the most recent match is taken and named in the answer)`),

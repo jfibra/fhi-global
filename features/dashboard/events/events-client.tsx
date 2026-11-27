@@ -30,6 +30,7 @@ import { EventsWebsiteGuide, NoWebsiteYet } from "./events-website-guide"
 import { RegistrationFieldsEditor } from "./registration-fields-editor"
 import { EventRegisterForm } from "@/components/public/event-register-form"
 import { EVENT_BRANDS, eventBrand } from "@/lib/events/brands"
+import { isAutoPosterUrl } from "@/lib/events/poster-url"
 import {
   fieldProblems,
   formatAnswer,
@@ -974,13 +975,16 @@ export function EventsClient({
                         </span>
                       )}
                     </span>
-                    <span
-                      className="absolute bottom-3 left-3 px-2 py-1.5 flex items-center border border-black/5"
-                      style={{ backgroundColor: brand.logoIsWhite ? "#001f3f" : "rgba(255,255,255,0.95)" }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={brand.logo} alt={brand.name} className="h-5 w-auto object-contain" />
-                    </span>
+                    {/* Not over an automatic poster: it carries the brand's logo itself, and the chip would sit on its date. */}
+                    {!isAutoPosterUrl(e.imageUrl) && (
+                      <span
+                        className="absolute bottom-3 left-3 px-2 py-1.5 flex items-center border border-black/5"
+                        style={{ backgroundColor: brand.logoIsWhite ? "#001f3f" : "rgba(255,255,255,0.95)" }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={brand.logo} alt={brand.name} className="h-5 w-auto object-contain" />
+                      </span>
+                    )}
                   </div>
                   <div className="p-4">
                     {/* Where it shows — admins see company and agents' events side by side */}

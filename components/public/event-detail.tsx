@@ -3,6 +3,7 @@ import Link from "next/link"
 import { ArrowLeft, ArrowRight, CalendarDays, ChevronRight, Clock, MapPin, Phone, Ticket } from "lucide-react"
 import { WhatsAppLogo } from "@/components/brand-icons"
 import { WhatsAppFabTarget } from "@/components/public/whatsapp-fab"
+import { isAutoPosterUrl } from "@/lib/events/poster-url"
 import type { EventHost } from "@/lib/events/host"
 import { ProjectLocationMap } from "@/components/public/project-location-map"
 import { eventBrand } from "@/lib/events/brands"
@@ -159,7 +160,9 @@ export function EventDetail({
           <ArrowLeft className="w-4 h-4" />
           {back.label}
         </Link>
-        {/* Presented-by plaque — big, gold-ringed, unmistakable */}
+        {/* Presented-by plaque — big, gold-ringed, unmistakable. Not over an automatic poster (lib/events/poster.tsx):
+            that poster carries the brand's logo and name itself, and the plaque would sit on its date. */}
+        {!isAutoPosterUrl(event.image_url) && (
         <span
           className="absolute bottom-5 left-4 sm:left-8 z-10 flex items-center gap-3 px-4 py-3 border-2 border-[#d6b357]"
           style={{ backgroundColor: brand.logoIsWhite ? "rgba(0,31,63,0.96)" : "rgba(255,255,255,0.97)" }}
@@ -174,6 +177,7 @@ export function EventDetail({
             </span>
           </span>
         </span>
+        )}
         {/* Big venue-screen QR on the hero (desktop only) — only while open */}
         {registrationOpen && <EventHeroQr />}
       </div>
