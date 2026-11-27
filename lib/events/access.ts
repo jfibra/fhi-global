@@ -62,25 +62,26 @@ export async function agentWebsite(
 }
 
 /**
- * What's wrong with where an agent's event would appear (migration 074) — the
- * response to send, or null when it's fine. An agent's event has to be
- * somewhere (fhiglobal.ae/events, their website, or both), and only an agent
- * with a website can show it there. Used by the create and update routes.
+ * What's wrong with where an agent's event would appear (migration 074), as
+ * plain data — null when it's fine. An agent's event has to be somewhere
+ * (fhiglobal.ae/events, their website, or both), and only an agent with a
+ * website can show it there. The one rule behind the create and update
+ * routes and lib/events/write.ts.
  */
-export function placementProblem(onMain: boolean, onWebsite: boolean, hasWebsite: boolean): NextResponse | null {
+export function placementIssue(onMain: boolean, onWebsite: boolean, hasWebsite: boolean): { error: string; code: string; status: number } | null {
   if (!onMain && !onWebsite) {
-    return NextResponse.json(
-      { error: "Choose where the event appears — fhiglobal.ae, your website, or both.", code: "no_placement" },
-      { status: 400 },
-    )
+    return { error: "Choose where the event appears — fhiglobal.ae, your website, or both.", code: "no_placement", status: 400 }
   }
   if (onWebsite && !hasWebsite) {
-    return NextResponse.json(
-      { error: "Create your website in the Website Builder first to show events on it — or choose fhiglobal.ae only.", code: "no_website" },
-      { status: 409 },
-    )
+    return { error: "Create your website in the Website Builder first to show events on it — or choose fhiglobal.ae only.", code: "no_website", status: 409 }
   }
   return null
+}
+
+/** placementIssue() as the response to send, or null when it's fine. */
+export function placementProblem(onMain: boolean, onWebsite: boolean, hasWebsite: boolean): NextResponse | null {
+  const issue = placementIssue(onMain, onWebsite, hasWebsite)
+  return issue ? NextResponse.json({ error: issue.error, code: issue.code }, { status: issue.status }) : null
 }
 
 /** agent_id → published site slug, for handing each listed event its public path. */

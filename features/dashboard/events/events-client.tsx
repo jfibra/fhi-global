@@ -339,6 +339,10 @@ export function EventsClient({
 
   // Set by load() from ?registrations=; the effect below opens it once openRegistrations exists.
   const [deepLinkEvent, setDeepLinkEvent] = useState<AdminEvent | null>(null)
+  // Set by load() from ?event=<id> — the "open in dashboard" link Claude's event tools hand out
+  // (lib/mcp/events.ts): that event's form opens, once, so the missing photo or map pin is one click away.
+  const [deepLinkEdit, setDeepLinkEdit] = useState<AdminEvent | null>(null)
+  const deepLinkEditDone = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -352,6 +356,11 @@ export function EventsClient({
       const wanted = new URLSearchParams(window.location.search).get("registrations")
       const hit = wanted ? (data.events ?? []).find((e) => e.id === wanted) : null
       if (hit) setDeepLinkEvent(hit)
+      // A link straight to one event's form. Only the first load: a save reloads the list.
+      const toEdit = deepLinkEditDone.current ? null : new URLSearchParams(window.location.search).get("event")
+      const editHit = toEdit ? (data.events ?? []).find((e) => e.id === toEdit) : null
+      deepLinkEditDone.current = true
+      if (editHit) setDeepLinkEdit(editHit)
     } catch {
       setError("Couldn't load events — refresh to try again.")
     } finally {
@@ -663,6 +672,18 @@ export function EventsClient({
     }, 0)
     return () => clearTimeout(t)
   }, [deepLinkEvent])
+
+  // Opened by ?event=<eventId> (Claude's "open in dashboard" link) once the list has loaded.
+  useEffect(() => {
+    if (!deepLinkEdit) return
+    const e = deepLinkEdit
+    // Deferred a tick so no state is set synchronously in the effect body.
+    const t = setTimeout(() => {
+      setDeepLinkEdit(null)
+      openEdit(e)
+    }, 0)
+    return () => clearTimeout(t)
+  }, [deepLinkEdit])
 
   // Per-row certificate sending from the attendee table (same endpoint the
   // Certificates dialog uses, so the design and logging are identical).

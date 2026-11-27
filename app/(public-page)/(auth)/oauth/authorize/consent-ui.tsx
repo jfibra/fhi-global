@@ -37,12 +37,17 @@ type Props = {
   name: string
   roleLabel: string
   items: string[]
+  /** A role that manages events is offered the one permission that writes (lib/oauth/server.ts OAUTH_SCOPE_EVENTS). */
+  eventsOffer?: boolean
   params: Record<string, string>
   blocked: "inactive" | "role" | null
 }
 
-export function ConsentUI({ app, backHost, name, roleLabel, items, params, blocked }: Props) {
+export function ConsentUI({ app, backHost, name, roleLabel, items, eventsOffer = false, params, blocked }: Props) {
   const [busy, setBusy] = useState<"allow" | "deny" | null>(null)
+  // Ticked by default: the person sees it, and unticking keeps the connection reading-only.
+  const [events, setEvents] = useState(true)
+  const writes = eventsOffer && events
   const [error, setError] = useState<string | null>(null)
 
   const decide = async (decision: "allow" | "deny") => {
@@ -52,7 +57,7 @@ export function ConsentUI({ app, backHost, name, roleLabel, items, params, block
       const res = await fetch("/api/oauth/authorize", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...params, decision }),
+        body: JSON.stringify({ ...params, decision, events: writes }),
       })
       const json = (await res.json().catch(() => ({}))) as { redirect?: string; error?: string }
       if (!res.ok || !json.redirect) {
@@ -67,7 +72,8 @@ export function ConsentUI({ app, backHost, name, roleLabel, items, params, block
     }
   }
 
-  const btn = "inline-flex h-11 flex-1 items-center justify-center rounded-xl px-5 text-[15px] font-semibold transition-colors disabled:opacity-60"
+  // flex-1 only side by side: stacked on a phone it would shrink the buttons to the text's height (23 px).
+  const btn = "inline-flex h-11 shrink-0 items-center justify-center rounded-xl px-5 text-[15px] font-semibold transition-colors disabled:opacity-60 sm:flex-1"
 
   return (
     <ConsentShell>
@@ -77,7 +83,7 @@ export function ConsentUI({ app, backHost, name, roleLabel, items, params, block
         </div>
         <div className="min-w-0">
           <h1 className="font-['Outfit'] text-[22px] font-bold leading-tight text-[#0d1117]">
-            Allow {app} to read your FHI data?
+            {writes ? `Allow ${app} to read your FHI data and manage events?` : `Allow ${app} to read your FHI data?`}
           </h1>
           <p className="mt-1.5 text-[14px] text-[#4b5563]">
             Signed in as <span className="font-semibold text-[#0d1117]">{name}</span> · {roleLabel}
@@ -104,8 +110,28 @@ export function ConsentUI({ app, backHost, name, roleLabel, items, params, block
               </li>
             ))}
           </ul>
+          {eventsOffer ? (
+            <>
+              <p className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">{app} can also</p>
+              <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-[#e8eaed] bg-[#fafbfc] px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={events}
+                  onChange={(e) => setEvents(e.target.checked)}
+                  disabled={busy !== null}
+                  className="mt-1 h-[18px] w-[18px] shrink-0 accent-[#001f3f]"
+                />
+                <span className="text-[14.5px] leading-relaxed text-[#1f2937]">
+                  <span className="font-semibold">Create, change and publish company events</span>
+                  <span className="mt-0.5 block text-[13.5px] text-[#4b5563]">
+                    Every event starts as a draft, and it goes live only when you ask for it. Nothing can be deleted. Untick this to keep {app} reading only.
+                  </span>
+                </span>
+              </label>
+            </>
+          ) : null}
           <p className="mt-4 text-[13px] leading-relaxed text-[#6b7280]">
-            Reading only — nothing is written to FHI. You can disconnect any time from Connect Claude in your dashboard, and a deactivated account is disconnected at once.
+            {writes ? "Apart from events, nothing is written to FHI." : "Reading only — nothing is written to FHI."} You can disconnect any time{eventsOffer ? "" : " from Connect Claude in your dashboard"}, and a deactivated account is disconnected at once.
           </p>
         </>
       )}

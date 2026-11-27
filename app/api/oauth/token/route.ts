@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
-import { clientSecretOk, consumeCode, createGrant, issueTokens, pkceMatches, refreshTokens, resolveClient } from "@/lib/oauth/server"
+import { OAUTH_SCOPE_EVENTS, clientSecretOk, consumeCode, createGrant, issueTokens, pkceMatches, refreshTokens, resolveClient, scopeHas } from "@/lib/oauth/server"
 import { allowRequest, clientIp } from "@/lib/rate-limit"
 
 /**
@@ -66,8 +66,8 @@ export async function POST(req: NextRequest) {
       if (p.redirect_uri && p.redirect_uri !== row.redirect_uri) return fail("invalid_grant", "redirect_uri does not match the sign-in.")
       if (!pkceMatches(p.code_verifier, row.code_challenge)) return fail("invalid_grant", "code_verifier does not match.")
 
-      const grantId = await createGrant({ userId: row.user_id, clientId: client.client_id, clientName: client.client_name, userAgent: req.headers.get("user-agent") })
-      const tokens = await issueTokens(grantId)
+      const grantId = await createGrant({ userId: row.user_id, clientId: client.client_id, clientName: client.client_name, userAgent: req.headers.get("user-agent"), scope: row.scope })
+      const tokens = await issueTokens(grantId, row.scope)
 
       const { data: who } = await createAdminSupabase().from("profiles").select("fullname, role").eq("id", row.user_id).maybeSingle<{ fullname: string | null; role: string | null }>()
       void logAuditEvent({
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         subjectType: "oauth_grant",
         subjectId: grantId,
         subjectLabel: client.client_name ?? "Claude",
-        description: `${who?.fullname ?? "A member"} connected ${client.client_name ?? "Claude"} to their FHI account`,
+        description: `${who?.fullname ?? "A member"} connected ${client.client_name ?? "Claude"} to their FHI account${scopeHas(row.scope, OAUTH_SCOPE_EVENTS) ? " and allowed it to create and publish events" : ""}`,
         ...requestContextFromRequest(req),
       })
       return NextResponse.json(tokens, { headers: NO_STORE })

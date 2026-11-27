@@ -114,13 +114,13 @@ export function eventWhenLabel(startIso: string | null | undefined, days: unknow
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
 /** "10:00" style Dubai wall time of an instant. */
-function dubaiHHMM(d: Date): string {
+export function dubaiHHMM(d: Date): string {
   const t = new Date(d.getTime() + 4 * 60 * 60 * 1000)
   return `${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}`
 }
 
 /** The Dubai calendar date "YYYY-MM-DD" of an instant. */
-function dubaiYMD(d: Date): string {
+export function dubaiYMD(d: Date): string {
   return new Date(d.getTime() + 4 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 

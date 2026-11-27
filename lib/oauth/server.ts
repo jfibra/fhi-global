@@ -3,7 +3,7 @@ import "server-only"
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import type { NextRequest } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { ROLES_ADMIN_STAFF, ROLES_AGENT_ASSISTANT, isAdminStaffRole, roleInList } from "@/lib/app-roles"
+import { ROLES_ADMIN_STAFF, ROLES_AGENT_ASSISTANT, canManageEvents, isAdminStaffRole, roleInList } from "@/lib/app-roles"
 import { SITE_URL } from "@/lib/seo"
 
 /**
@@ -23,6 +23,15 @@ import { SITE_URL } from "@/lib/seo"
  */
 
 export const OAUTH_SCOPE = "fhi:read"
+/**
+ * Create, edit and publish company events from Claude (2026-11-27,
+ * lib/mcp/events.ts). The one permission that writes: offered on the consent
+ * screen only to a role that manages events in the dashboard, granted only
+ * when the person leaves it ticked, and stored on the grant — a connection
+ * made before it existed stays reading-only until it is added again.
+ */
+export const OAUTH_SCOPE_EVENTS = "fhi:events"
+export const OAUTH_SCOPES: readonly string[] = [OAUTH_SCOPE, OAUTH_SCOPE_EVENTS]
 export const MCP_ME_PATH = "/api/mcp/me"
 export const CONSENT_PATH = "/oauth/authorize"
 
@@ -33,6 +42,21 @@ const CODE_TTL_S = 10 * 60
 /** Who may sign in: the roles the agent FHI Assistant serves, plus admin staff (who get the admin tools). */
 export const MCP_SIGN_IN_ROLES: readonly string[] = [...ROLES_AGENT_ASSISTANT, ...ROLES_ADMIN_STAFF]
 export const mcpSignInAllowed = (role: string | null | undefined) => roleInList(role, MCP_SIGN_IN_ROLES)
+
+/** May this role be offered the events permission? The dashboard's own rule for company events. */
+export const eventsScopeAllowed = (role: string | null | undefined) => canManageEvents(role)
+
+/** Does a stored scope string ("fhi:read fhi:events") hold this permission? */
+export const scopeHas = (scope: string | null | undefined, one: string) => (scope ?? "").split(/\s+/).includes(one)
+
+/**
+ * What a sign-in is granted: reading always; events only for a role that
+ * may have it AND when the person ticked it on the consent screen. Decided
+ * here from the role and the person's choice — never from what the app asked for.
+ */
+export function grantedScope(role: string | null | undefined, wantsEvents: boolean): string {
+  return wantsEvents && eventsScopeAllowed(role) ? `${OAUTH_SCOPE} ${OAUTH_SCOPE_EVENTS}` : OAUTH_SCOPE
+}
 
 /** What the consent screen lists for a role — the plain words, matching the tools the person then gets. */
 export function consentItems(role: string | null | undefined): string[] {
@@ -74,7 +98,7 @@ export function authorizationServerMetadata(issuer: string) {
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none", "client_secret_post", "client_secret_basic"],
     revocation_endpoint_auth_methods_supported: ["none", "client_secret_post", "client_secret_basic"],
-    scopes_supported: [OAUTH_SCOPE],
+    scopes_supported: [...OAUTH_SCOPES],
     client_id_metadata_document_supported: true,
     service_documentation: `${issuer}/api/mcp`,
   }
@@ -84,7 +108,7 @@ export function protectedResourceMetadata(issuer: string) {
   return {
     resource: `${issuer}${MCP_ME_PATH}`,
     authorization_servers: [issuer],
-    scopes_supported: [OAUTH_SCOPE],
+    scopes_supported: [...OAUTH_SCOPES],
     bearer_methods_supported: ["header"],
     resource_name: "FHI Global",
     resource_documentation: `${issuer}/api/mcp`,
@@ -196,7 +220,7 @@ export async function registerClient(input: unknown): Promise<RegisterResult> {
       token_endpoint_auth_method: method,
       grant_types: grants.length ? grants : ["authorization_code", "refresh_token"],
       response_types: ["code"],
-      scope: OAUTH_SCOPE,
+      scope: OAUTH_SCOPES.join(" "),
     },
   }
 }
@@ -315,7 +339,7 @@ type CodeRow = {
   resource: string | null
 }
 
-export async function issueCode(p: { clientId: string; userId: string; redirectUri: string; codeChallenge: string; resource: string }): Promise<string> {
+export async function issueCode(p: { clientId: string; userId: string; redirectUri: string; codeChallenge: string; resource: string; scope: string }): Promise<string> {
   const code = token("fhi_ac_")
   const admin = createAdminSupabase()
   const { error } = await admin.from("oauth_codes").insert({
@@ -325,7 +349,7 @@ export async function issueCode(p: { clientId: string; userId: string; redirectU
     redirect_uri: p.redirectUri,
     code_challenge: p.codeChallenge,
     code_challenge_method: "S256",
-    scope: OAUTH_SCOPE,
+    scope: p.scope,
     resource: p.resource || null,
     expires_at: plusSeconds(CODE_TTL_S),
   })
@@ -363,18 +387,19 @@ export type GrantRow = {
 
 export type IssuedTokens = { access_token: string; token_type: "Bearer"; expires_in: number; refresh_token: string; scope: string }
 
-export async function createGrant(p: { userId: string; clientId: string; clientName: string | null; userAgent: string | null }): Promise<string> {
+export async function createGrant(p: { userId: string; clientId: string; clientName: string | null; userAgent: string | null; scope: string }): Promise<string> {
   const admin = createAdminSupabase()
   const { data, error } = await admin
     .from("oauth_grants")
-    .insert({ user_id: p.userId, client_id: p.clientId, client_name: p.clientName, scope: OAUTH_SCOPE, user_agent: p.userAgent?.slice(0, 300) ?? null })
+    .insert({ user_id: p.userId, client_id: p.clientId, client_name: p.clientName, scope: p.scope || OAUTH_SCOPE, user_agent: p.userAgent?.slice(0, 300) ?? null })
     .select("id")
     .single<{ id: string }>()
   if (error) throw new Error(error.message)
   return data.id
 }
 
-export async function issueTokens(grantId: string): Promise<IssuedTokens> {
+/** A pass pair for a grant. `scope` is the grant's own — what the person allowed — echoed to the app. */
+export async function issueTokens(grantId: string, scope: string): Promise<IssuedTokens> {
   const access = token("fhi_at_")
   const refresh = token("fhi_rt_")
   const admin = createAdminSupabase()
@@ -386,7 +411,7 @@ export async function issueTokens(grantId: string): Promise<IssuedTokens> {
     refresh_expires_at: plusSeconds(REFRESH_TTL_S),
   })
   if (error) throw new Error(error.message)
-  return { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL_S, refresh_token: refresh, scope: OAUTH_SCOPE }
+  return { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL_S, refresh_token: refresh, scope: scope || OAUTH_SCOPE }
 }
 
 type TokenRow = {
@@ -411,10 +436,10 @@ export async function refreshTokens(refreshToken: string, clientId: string): Pro
   if (grant.client_id !== clientId) return null
   const { data: rotated } = await admin.from("oauth_tokens").update({ rotated_at: nowIso() }).eq("id", data.id).is("rotated_at", null).select("id").maybeSingle<{ id: string }>()
   if (!rotated) return null
-  return issueTokens(grant.id)
+  return issueTokens(grant.id, grant.scope)
 }
 
-export type McpIdentity = { grantId: string; userId: string; clientId: string; expiresAt: number; lastUsedAt: string | null }
+export type McpIdentity = { grantId: string; userId: string; clientId: string; expiresAt: number; lastUsedAt: string | null; scope: string }
 
 /** The person behind an access pass — null when the pass is unknown, expired, rotated or its connection disconnected. */
 export async function authenticateAccessToken(accessToken: string): Promise<McpIdentity | null> {
@@ -425,7 +450,7 @@ export async function authenticateAccessToken(accessToken: string): Promise<McpI
   if (!data || !grant || data.rotated_at || grant.revoked_at) return null
   const expiresAt = Math.floor(new Date(data.access_expires_at).getTime() / 1000)
   if (expiresAt * 1000 < Date.now()) return null
-  return { grantId: grant.id, userId: grant.user_id, clientId: grant.client_id, expiresAt, lastUsedAt: grant.last_used_at }
+  return { grantId: grant.id, userId: grant.user_id, clientId: grant.client_id, expiresAt, lastUsedAt: grant.last_used_at, scope: grant.scope || OAUTH_SCOPE }
 }
 
 /** last_used_at, written at most every five minutes so a chat full of questions is one update. */

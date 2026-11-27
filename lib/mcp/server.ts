@@ -6,6 +6,7 @@ import { z } from "zod"
 import { API_ENDPOINTS, type ApiEndpoint } from "@/lib/api-catalog"
 import { requireExternalKey } from "@/lib/external-api"
 import { FHI_CHAT_TOOLS, runFhiChatTool } from "@/lib/fhi-chat-tools"
+import { eventToolInstructions, registerEventTools, type EventWriter } from "@/lib/mcp/events"
 import { SITE_URL } from "@/lib/seo"
 import { GET as salesGet } from "@/app/api/external/sales/route"
 import { GET as salesTopGet } from "@/app/api/external/sales/top/route"
@@ -20,7 +21,8 @@ import { GET as merchantsGet } from "@/app/api/external/merchants/route"
 /**
  * FHI's MCP server (2026-11-23): tools Claude can call — in claude.ai (a
  * custom connector), Claude Code, or FH ONE through the Messages API's MCP
- * connector. Two sets, both read-only and both behind the external API key:
+ * connector. Two sets, both read-only and both behind the external API key
+ * (the one exception is at the end):
  *
  * - `fhi_*`: the keyed external API. Every tool is one GET of
  *   app/api/external/*, invoked in-process with the caller's own key, so the
@@ -34,6 +36,13 @@ import { GET as merchantsGet } from "@/app/api/external/merchants/route"
  *   events, news, data health, birthdays. The same functions the admin chat
  *   runs, so the answers match it. Note these include lead and client
  *   contact details: the key is admin-level reading.
+ *
+ * The exception (2026-11-27): `fhi_event_*`, the event tools of
+ * lib/mcp/events.ts, which create, change and publish company events. They
+ * are added only when the caller hands in an `events` writer — which only
+ * POST /api/mcp/me does, for a signed-in person whose role manages events
+ * and who allowed it on the consent screen. The keyed endpoint never passes
+ * one, so it stays read-only.
  *
  * A fresh server is built per request (stateless).
  */
@@ -236,8 +245,12 @@ function keyDenied(authorization: string): string | null {
   return denied.status === 401 ? NO_KEY_TEXT : `FHI answered ${denied.status}.`
 }
 
-export function buildFhiMcpServer(authorization: string): McpServer {
-  const server = new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION, title: "FHI Global" })
+export function buildFhiMcpServer(authorization: string, opts: { events?: EventWriter } = {}): McpServer {
+  const server = new McpServer(
+    { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION, title: "FHI Global" },
+    opts.events ? { instructions: eventToolInstructions(opts.events) } : undefined,
+  )
+  if (opts.events) registerEventTools(server, opts.events)
   for (const t of TOOLS) {
     const e = API_ENDPOINTS.find((x) => x.key === t.key)
     if (!e) continue

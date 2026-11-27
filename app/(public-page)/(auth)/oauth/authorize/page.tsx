@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { roleToLabel } from "@/lib/app-roles"
 import { getProfileByUserId, isInactiveProfile } from "@/lib/auth"
-import { CONSENT_PATH, checkAuthorizeRequest, clientDisplayName, consentItems, mcpSignInAllowed } from "@/lib/oauth/server"
+import { CONSENT_PATH, checkAuthorizeRequest, clientDisplayName, consentItems, eventsScopeAllowed, mcpSignInAllowed } from "@/lib/oauth/server"
 import { createClient, hasServerSupabaseEnv } from "@/lib/supabase/server"
 import { ConsentUI, ConsentShell } from "./consent-ui"
 
@@ -12,7 +12,9 @@ import { ConsentUI, ConsentShell } from "./consent-ui"
  * Signed out → the staff sign-in with `next` back here; signed in → "Allow
  * Claude to read your FHI data?" with what their role gets. Allow and Cancel
  * post to /api/oauth/authorize, which mints the code and hands back the
- * address to go to.
+ * address to go to. A role that manages events is also offered a ticked
+ * box, "Create, change and publish company events" (2026-11-27) — the only
+ * permission that writes.
  */
 
 export const dynamic = "force-dynamic"
@@ -57,6 +59,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams?: P
       name={profile?.fullname?.trim() || user.email || "you"}
       roleLabel={roleToLabel(profile?.role)}
       items={consentItems(profile?.role)}
+      eventsOffer={!blocked && eventsScopeAllowed(profile?.role)}
       params={{ ...check.params, response_type: "code" }}
       blocked={blocked}
     />

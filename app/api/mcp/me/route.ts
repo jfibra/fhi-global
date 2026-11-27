@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createMcpHandler } from "@modelcontextprotocol/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
-import { isAdminStaffRole } from "@/lib/app-roles"
-import { isInactiveProfile } from "@/lib/auth"
+import { canManageEvents, isAdminStaffRole } from "@/lib/app-roles"
+import { requestContextFromRequest } from "@/lib/audit-log"
+import { getDashboardRouteByRole, isInactiveProfile } from "@/lib/auth"
 import type { AgentChatCaller } from "@/lib/fhi-agent-chat-tools"
+import type { EventWriter } from "@/lib/mcp/events"
 import { buildPersonalMcpServer } from "@/lib/mcp/personal"
 import { MCP_SERVER_NAME, buildFhiMcpServer } from "@/lib/mcp/server"
-import { MCP_ME_PATH, OAUTH_SCOPE, authenticateAccessToken, bearerToken, mcpSignInAllowed, oauthIssuer, touchGrant } from "@/lib/oauth/server"
+import { MCP_ME_PATH, OAUTH_SCOPE_EVENTS, authenticateAccessToken, bearerToken, mcpSignInAllowed, oauthIssuer, scopeHas, touchGrant } from "@/lib/oauth/server"
 import { allowRequest } from "@/lib/rate-limit"
 
 /**
@@ -20,14 +22,18 @@ import { allowRequest } from "@/lib/rate-limit"
  * rotated or disconnected), the profile active, the role one the assistant
  * serves. Agents and team leaders get the agent FHI Assistant's tools bound
  * to them (lib/mcp/personal.ts); admin staff get the admin server
- * (lib/mcp/server.ts) with the server's own key.
+ * (lib/mcp/server.ts) with the server's own key — and, when their role
+ * manages events and their connection carries the events permission (the
+ * ticked box on the consent screen), the event tools that write
+ * (lib/mcp/events.ts). Both are re-checked on every call, so a role change
+ * or a reading-only connection never reaches them.
  */
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
-type Who = { caller: AgentChatCaller; admin: boolean }
+type Who = { caller: AgentChatCaller; admin: boolean; events?: EventWriter }
 
 const adminAuthorization = () => {
   const key = process.env.FHI_EXTERNAL_API_KEY?.trim()
@@ -38,7 +44,7 @@ const handler = createMcpHandler(
   (ctx) => {
     const who = ctx.authInfo?.extra?.who as Who | undefined
     if (!who) throw new Error("No identity on the request")
-    return who.admin ? buildFhiMcpServer(adminAuthorization()) : buildPersonalMcpServer(who.caller)
+    return who.admin ? buildFhiMcpServer(adminAuthorization(), { events: who.events }) : buildPersonalMcpServer(who.caller)
   },
   { legacy: "stateless", responseMode: "json", onerror: (e) => console.error("[mcp/me]", e.message) },
 )
@@ -78,9 +84,19 @@ async function serve(req: NextRequest) {
   }
   void touchGrant(identity).catch(() => undefined)
 
-  const who: Who = { caller: { userId: profile.id, name: profile.fullname, role: profile.role }, admin: isAdminStaffRole(profile.role) }
+  const admin = isAdminStaffRole(profile.role)
+  const events: EventWriter | undefined =
+    admin && canManageEvents(profile.role) && scopeHas(identity.scope, OAUTH_SCOPE_EVENTS)
+      ? {
+          actor: { id: profile.id, name: profile.fullname, role: profile.role },
+          request: requestContextFromRequest(req),
+          origin: issuer,
+          dashboard: getDashboardRouteByRole(profile.role),
+        }
+      : undefined
+  const who: Who = { caller: { userId: profile.id, name: profile.fullname, role: profile.role }, admin, events }
   return handler.fetch(req, {
-    authInfo: { token, clientId: identity.clientId || MCP_SERVER_NAME, scopes: [OAUTH_SCOPE], expiresAt: identity.expiresAt, extra: { who } },
+    authInfo: { token, clientId: identity.clientId || MCP_SERVER_NAME, scopes: identity.scope.split(/\s+/).filter(Boolean), expiresAt: identity.expiresAt, extra: { who } },
   })
 }
 

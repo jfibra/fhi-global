@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import { after } from "next/server"
-import { revalidatePath } from "next/cache"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { agentWebsite, placementProblem, publishedSiteSlugs, requireEventAccess } from "@/lib/events/access"
 import { eventPublicPath } from "@/lib/events/paths"
 import { sanitizeEventInput } from "@/lib/events/validate"
+import { createEvent } from "@/lib/events/write"
 import { normalizeDayPax } from "@/lib/events/pax"
 import { parseRegistrationFields } from "@/lib/events/fields"
 import { parseCertificateSettings } from "@/lib/events/certificate"
-import { logAuditEvent, requestContextFromRequest } from "@/lib/audit-log"
-import { SITE_URL } from "@/lib/seo"
-import { submitToIndexNow } from "@/lib/indexnow"
+import { requestContextFromRequest } from "@/lib/audit-log"
 
 // Event mutations run on the service-role client, so the audit_logs DB trigger
-// can't attribute an actor (auth.uid() is NULL) — routes log explicitly instead.
+// can't attribute an actor (auth.uid() is NULL) — lib/events/write.ts logs
+// explicitly with the actor handed in here.
 function actorFrom(ctx: { userId: string; email: string | null; profile: { role: string | null; fullname: string | null } }) {
   return { id: ctx.userId, name: ctx.profile.fullname ?? ctx.email ?? null, role: ctx.profile.role }
 }
@@ -98,24 +96,13 @@ export async function GET() {
   return NextResponse.json({ events, scope: access.scope.kind })
 }
 
-// URL slug from the title ("FHI Global Summit 2026" -> "fhi-global-summit-2026").
-// Generated once at creation and kept stable afterwards so shared links and
-// printed QR codes never break when the title is edited.
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80)
-}
-
 /**
  * Create an event. Admin staff create company events (listed on /events); a
  * Website Builder user creates their OWN event and chooses where it appears
  * (074): fhiglobal.ae/events, their website, or both. Showing it on their
- * website needs one; fhiglobal.ae only doesn't.
+ * website needs one; fhiglobal.ae only doesn't. The save itself (slug, audit
+ * row, page purges, IndexNow) is createEvent() in lib/events/write.ts, shared
+ * with Claude's event tools.
  */
 export async function POST(req: NextRequest) {
   const access = await requireEventAccess()
@@ -144,61 +131,13 @@ export async function POST(req: NextRequest) {
     delete input.show_on_website
   }
 
-  const base = slugify(input.title)
-  let slug: string | null = base || null
-
-  let result = await admin
-    .from("events")
-    .insert({ ...input, slug, created_by: session.context.userId, agent_id: ownerId })
-    .select("id")
-    .single()
-
-  // Slug taken by another event — retry once with a short suffix.
-  if (result.error?.code === "23505" && slug) {
-    slug = `${base}-${Math.random().toString(36).slice(2, 7)}`
-    result = await admin
-      .from("events")
-      .insert({ ...input, slug, created_by: session.context.userId, agent_id: ownerId })
-      .select("id")
-      .single()
-  }
-
-  if (result.error || !result.data) {
-    return NextResponse.json({ error: "Failed to create event" }, { status: 500 })
-  }
-
-  await logAuditEvent({
-    category: "events",
-    event: "created",
-    source: "dashboard",
-    actor: actorFrom(session.context),
-    subjectType: "events",
-    subjectId: String(result.data.id),
-    subjectLabel: input.title,
-    description: `Created event "${input.title}"`,
-    newValues: { ...input, slug },
-    ...requestContextFromRequest(req),
+  const created = await createEvent(admin, {
+    input,
+    ownerId,
+    site,
+    meta: { actor: actorFrom(session.context), source: "dashboard", request: requestContextFromRequest(req) },
   })
+  if (!created.ok) return NextResponse.json({ error: created.error }, { status: created.status })
 
-  // Created live → tell IndexNow after the response is sent (after() keeps
-  // the serverless function alive; see app/news-sitemap.xml/route.ts).
-  const publicPath = eventPublicPath(
-    { id: String(result.data.id), slug },
-    input.show_on_website && site?.isPublished ? site.slug : null,
-  )
-  // The URL Google should index: /events/<slug> whenever the event is on the
-  // main page (company events always), else the agent's website page.
-  const mainPath = `/events/${slug ?? String(result.data.id)}`
-  const canonicalPath = !ownerId || input.show_on_main ? mainPath : publicPath
-  if (ownerId && input.show_on_main) revalidatePath("/events")
-  if (input.status === "published") {
-    const loc = `${SITE_URL.replace(/\/$/, "")}${canonicalPath}`
-    after(() => submitToIndexNow([loc]))
-  }
-  revalidatePath(publicPath)
-  if (canonicalPath !== publicPath) revalidatePath(canonicalPath)
-  // The agent's site lists their events — refresh its main page too.
-  if (site?.isPublished) revalidatePath(`/website/${site.slug}`)
-
-  return NextResponse.json({ id: result.data.id })
+  return NextResponse.json({ id: created.id })
 }

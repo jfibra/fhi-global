@@ -26,6 +26,15 @@ const CLAUDE_QUESTIONS = [
   "Which support tickets are still open?",
 ]
 
+/** What an admin can say once the sign-in connector may create events (lib/mcp/events.ts). */
+const CLAUDE_EVENT_ASKS = [
+  "Create an event: Open House at Azizi Venice, 12 December 2026, 3 pm, 50 seats.",
+  "Make an event like the last orientation, on 15 January 2027 at 10 am.",
+  "Write the description from these notes: free lunch, meet the developer, bring your Emirates ID.",
+  "What is still missing on my draft events?",
+  "Publish it.",
+]
+
 function CopyButton({ text, label = "Copy", className = "" }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false)
   const copy = async () => {
@@ -45,7 +54,7 @@ function CopyButton({ text, label = "Copy", className = "" }: { text: string; la
   )
 }
 
-type SignIn = { id: string; user_id: string; name: string | null; role: string | null; status: string | null; client_name: string | null; created_at: string; last_used_at: string | null }
+type SignIn = { id: string; user_id: string; name: string | null; role: string | null; status: string | null; client_name: string | null; created_at: string; last_used_at: string | null; events?: boolean }
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "never")
 
@@ -92,7 +101,7 @@ function ClaudeSignIns() {
         {rows ? <span className="text-[13px] text-[#6b7280]">{rows.length ? `${rows.length} connected` : "Nobody connected yet"}</span> : null}
       </div>
       <p className="mt-1 text-[14px] text-[#374151]">
-        Agents and team leaders who connected their own Claude with their FHI login (Connect Claude in their dashboard). Each reads only their own data. Disconnecting refuses their next call; they can connect again.
+        Agents and team leaders who connected their own Claude with their FHI login (Connect Claude in their dashboard). Each reads only their own data. An admin who signed in is listed too, and &ldquo;Can create events&rdquo; marks a connection that was allowed to create and publish events. Disconnecting refuses their next call; they can connect again.
       </p>
       {error ? <p className="mt-3 text-[14px] text-[#b42318]">{error}</p> : null}
       {rows && rows.length ? (
@@ -102,6 +111,7 @@ function ClaudeSignIns() {
               <div className="min-w-0">
                 <p className="font-semibold text-[#0d1117]">
                   {r.name ?? "Unknown account"} <span className="font-normal text-[#6b7280]">· {roleToLabel(r.role)}</span>
+                  {r.events ? <span className="ml-2 inline-block rounded-full bg-[#fdf6e3] px-2 py-0.5 align-middle text-[12px] font-semibold text-[#7a5a00]">Can create events</span> : null}
                 </p>
                 <p className="text-[13px] text-[#6b7280]">
                   {r.client_name?.trim() || "Claude"} · connected {when(r.created_at)} · last used {when(r.last_used_at)}
@@ -337,6 +347,22 @@ export default function ApiPage() {
                 ))}
               </ul>
               <p className="mt-2 text-[13px] text-[#6b7280]">claude.ai reads the tool list when the connector is added. When new tools are added here, remove the connector and add it again once; changes inside a tool need nothing.</p>
+            </div>
+            <div className="mt-3 rounded-xl border border-[#e8eaed] bg-[#f8fafc] px-4 py-3 text-[13.5px] leading-relaxed text-[#374151]">
+              <p className="font-semibold text-[#0d1117]">Create events from Claude (admins)</p>
+              <p className="mt-1">
+                The key connector above only reads. To create events, add the sign-in connector instead: URL{" "}
+                <code className="font-mono text-[12.5px]">{status?.site ?? base}/api/mcp/me</code>, sign in with your admin account, and leave &ldquo;Create, change and publish company events&rdquo; ticked before you press Allow. It has every tool of the key connector, so on a plan with one custom connector it can replace it. Every event starts as a draft, goes live only when you say so, is written to the Activity Logs with &ldquo;via Claude&rdquo;, and nothing can be deleted.
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {CLAUDE_EVENT_ASKS.map((q) => (
+                  <li key={q} className="flex items-center justify-between gap-3">
+                    <span className="min-w-0">&ldquo;{q}&rdquo;</span>
+                    <CopyButton text={q} label="Copy" className="shrink-0" />
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[13px] text-[#6b7280]">You can also paste a message or a poster and say &ldquo;make this an event&rdquo;. A new cover photo and a new map pin are added in the dashboard; Claude gives the link that opens the event.</p>
             </div>
           </div>
         </div>

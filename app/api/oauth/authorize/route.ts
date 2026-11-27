@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireActiveSession } from "@/lib/auth-guard"
-import { checkAuthorizeRequest, issueCode, mcpSignInAllowed } from "@/lib/oauth/server"
+import { checkAuthorizeRequest, grantedScope, issueCode, mcpSignInAllowed } from "@/lib/oauth/server"
 
 /**
  * The Allow / Cancel decision of the consent page (/oauth/authorize). The
@@ -9,6 +9,10 @@ import { checkAuthorizeRequest, issueCode, mcpSignInAllowed } from "@/lib/oauth/
  * the page — and on Allow a one-time code is minted for that person. The
  * page then navigates to the address returned, so the CSP's form-action
  * rule is never involved.
+ *
+ * What the code may do is decided here: reading always, plus creating and
+ * publishing events only when the page sent `events: true` (the ticked box)
+ * AND the role manages events — never from the `scope` the app asked for.
  */
 
 export const runtime = "nodejs"
@@ -56,6 +60,7 @@ export async function POST(req: NextRequest) {
       redirectUri: params.redirect_uri,
       codeChallenge: params.code_challenge,
       resource: params.resource,
+      scope: grantedScope(role, body.events === true),
     })
     back.searchParams.set("code", code)
     return NextResponse.json({ redirect: back.toString() }, { headers: { "cache-control": "no-store" } })

@@ -2,12 +2,13 @@ import { NextResponse } from "next/server"
 import { createAdminSupabase } from "@/lib/admin-supabase"
 import { ROLES_ADMIN_STAFF } from "@/lib/app-roles"
 import { requireRole } from "@/lib/auth-guard"
-import { listGrants } from "@/lib/oauth/server"
+import { OAUTH_SCOPE_EVENTS, listGrants, scopeHas } from "@/lib/oauth/server"
 
 /**
  * Every live Claude connection, with who it belongs to — the "Claude
  * sign-ins" list on the admin API page. Disconnect anyone with
- * DELETE /api/admin/connected-apps/[id]. Admin staff only.
+ * DELETE /api/admin/connected-apps/[id]. Admin staff only. `events` marks a
+ * connection that may create and publish events (lib/mcp/events.ts).
  */
 
 export const runtime = "nodejs"
@@ -30,7 +31,7 @@ export async function GET() {
       {
         apps: grants.map((g) => {
           const p = people.get(g.user_id)
-          return { id: g.id, user_id: g.user_id, name: p?.fullname ?? null, role: p?.role ?? null, status: p?.status ?? null, client_name: g.client_name, created_at: g.created_at, last_used_at: g.last_used_at }
+          return { id: g.id, user_id: g.user_id, name: p?.fullname ?? null, role: p?.role ?? null, status: p?.status ?? null, client_name: g.client_name, created_at: g.created_at, last_used_at: g.last_used_at, events: scopeHas(g.scope, OAUTH_SCOPE_EVENTS) }
         }),
       },
       { headers: { "cache-control": "no-store" } },
