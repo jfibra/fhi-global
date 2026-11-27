@@ -10,6 +10,7 @@ import { MAX_EVENT_DAYS, dubaiHHMM, dubaiYMD, eventIsPast, eventSchedule, eventW
 import { MAX_DAY_PAX, normalizeDayPax } from "@/lib/events/pax"
 import { sanitizeEventInput } from "@/lib/events/validate"
 import { createEvent, updateEvent, type EventWriteMeta } from "@/lib/events/write"
+import { EVENT_CARD_TOOL_META, registerEventCard } from "@/lib/mcp/event-card"
 
 /**
  * Claude's event tools (2026-11-27, boss's idea via Juliecor): an admin
@@ -43,6 +44,10 @@ import { createEvent, updateEvent, type EventWriteMeta } from "@/lib/events/writ
  *     event, registrations, certificates and emails stay in the dashboard.
  *   · a map pin is never made from typed text (the Maps rule): it comes only
  *     with a venue reused from an event whose pin was picked in the dashboard.
+ *
+ * What the person SEES: every tool points at the event card
+ * (lib/mcp/event-card.ts), which Claude shows in the chat with the tool's
+ * answer — photo, date, venue, seats, Draft / Live, what is missing.
  */
 
 export type EventWriter = {
@@ -208,14 +213,17 @@ function missingOf(r: Row, w: EventWriter): Missing[] {
 /** One event as Claude should describe it: what is saved, where to open it, what is missing. */
 function describe(r: Row, w: EventWriter) {
   const days = normalizeEventDays(r.event_days)
-  const missing = missingOf(r, w)
   const status = statusOf(r)
+  // A live event is already published: only what would improve its page is still worth saying.
+  const missing = missingOf(r, w).filter((m) => status !== "published" || !m.needed_to_publish)
+  const past = eventIsPast(r.event_date, r.event_days, Date.now(), r.day_times)
   const seats = normalizeDayPax(r.day_pax, days)
   return {
     id: r.id,
     title: r.title,
     status,
     is_public: status === "published",
+    ...(past ? { is_past: true } : {}),
     when: eventWhenLabel(r.event_date, r.event_days, "long") ?? "no date yet",
     ...(days > 1 ? { schedule: eventSchedule(r.event_date, days, r.day_times).map((d) => `Day ${d.day}: ${d.dateLabel}, ${d.time}`) } : {}),
     time_zone: "Dubai time (GST)",
@@ -223,6 +231,7 @@ function describe(r: Row, w: EventWriter) {
     venue: r.venue ?? null,
     has_map_pin: Boolean(pinOf(r)),
     has_cover_photo: Boolean(r.image_url),
+    cover_photo: r.image_url ?? null,
     description: r.description ?? null,
     brand: eventBrand(r.brand).name,
     registration_open: r.registration_open !== false,
@@ -626,6 +635,7 @@ export function eventToolInstructions(w: EventWriter): string {
     "Before you create an event, tell the person the title, date, time and venue you are about to save. When they paste a message or a poster, read the details from it and confirm them the same way.",
     "A new event is always a draft and is not public. After every save the tool lists what is still missing and how to fix each item: tell the person, and offer to fill what you can (write the description yourself from their notes). When they say an event is like a past one, use copy_from so the photo, the venue with its map pin, the sign-up fields and the certificate design come along.",
     "Publish only when the person asks for it. Nothing can be deleted from here. Agents' own events, registrations, certificates and emails are handled in the FHI dashboard: give the open_in_dashboard link.",
+    "Each event tool also shows the person a card in the chat with the event's photo, date, venue, seats, status, what is missing and an Open in dashboard button. Do not repeat the card field by field: say in a sentence or two what happened and what the next step is.",
   ].join(" ")
 }
 
@@ -643,6 +653,8 @@ async function run(name: string, body: () => Promise<unknown>): Promise<ToolResu
 }
 
 export function registerEventTools(server: McpServer, w: EventWriter): void {
+  // The card Claude shows with each answer; every tool below points at it.
+  registerEventCard(server)
   server.registerTool(
     "fhi_event_create",
     {
@@ -654,6 +666,7 @@ export function registerEventTools(server: McpServer, w: EventWriter): void {
         copy_from: REF.optional().describe("Make it like a past event: its id, or words from its title (the most recent match is taken and named in the answer)"),
       }),
       annotations: WRITES,
+      _meta: EVENT_CARD_TOOL_META,
     },
     async (args) => run("create", () => create(args as FieldArgs & { copy_from?: string }, w)),
   )
@@ -665,6 +678,7 @@ export function registerEventTools(server: McpServer, w: EventWriter): void {
         "Change a company event that is still a DRAFT: send only the fields that change. A live event is refused (take it back to draft first, or use the dashboard). Changing the venue's text removes its old map pin; venue_from brings a venue with its pin. Answers with what changed and what is still missing.",
       inputSchema: z.object({ event: REF.describe("The event: its id (best), or its exact title / words from it"), ...FIELDS }),
       annotations: CHANGES,
+      _meta: EVENT_CARD_TOOL_META,
     },
     async (args) => run("update", () => update(args as FieldArgs & { event: string }, w)),
   )
@@ -679,6 +693,7 @@ export function registerEventTools(server: McpServer, w: EventWriter): void {
         action: z.enum(["publish", "unpublish"]),
       }),
       annotations: CHANGES,
+      _meta: EVENT_CARD_TOOL_META,
     },
     async (args) => run("publish", () => publish(args as { event: string; action: "publish" | "unpublish" }, w)),
   )
@@ -690,6 +705,7 @@ export function registerEventTools(server: McpServer, w: EventWriter): void {
         "Read one event as the dashboard has it — any status, drafts included — with what it still needs before it can go live. Without `event`: the company's drafts and upcoming live events.",
       inputSchema: z.object({ event: REF.optional().describe("An id, a page link, or words from the title. Leave out to list drafts and upcoming events.") }),
       annotations: READS,
+      _meta: EVENT_CARD_TOOL_META,
     },
     async (args) => run("check", () => check(args as { event?: string }, w)),
   )
