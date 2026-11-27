@@ -9,6 +9,7 @@ import { ProfilePhotoGate } from "@/components/dashboard/profile-photo-gate"
 import { PartnerInfoGate } from "@/components/dashboard/partner-info-gate"
 import { BRN_REQUIRED_PARAM, PROFILE_SAVED_EVENT, isProfilePath, needsBrnAnswer, type ProfileSavedDetail } from "@/lib/brn-required"
 import { AssistantTeaserPopup } from "@/components/dashboard/assistant-teaser-popup"
+import { ClaudeEventsPopup, type ClaudeEventsPopupState } from "@/components/dashboard/claude-events-popup"
 import { partnerInfoMetadata } from "@/lib/partner-signup"
 import { PageLoader } from "@/components/ui/PageLoader"
 import { getDashboardRouteByRole, getProfileByUserId, isInactiveProfile, isUploadedProfilePhoto, type AppProfile, type AppUser } from "@/lib/auth"
@@ -32,6 +33,8 @@ import { readViewAsCookie } from "@/lib/view-as"
 export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  // The FHI Assistant teaser was closed on this visit: the next pop-up waits for another visit, not the next second.
+  const [teaserJustClosed, setTeaserJustClosed] = useState(false)
   const [session, setSession] = useState<{ user: AppUser; profile: AppProfile } | null>(null)
 
   // The profile page saves on its own; it tells us what it saved so the BRN
@@ -125,6 +128,18 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
     (roleInList(session.profile.role, ROLES_AGENT_ASSISTANT) || isAdminStaffRole(session.profile.role)) &&
     typeof meta.assistant_teaser_seen_at !== "string"
 
+  // Agents and team leaders are told once that their Claude can now create their events, with the steps for
+  // their situation (connect, or renew an older connection) — after the teaser, never two pop-ups at once, and
+  // not on the Connect Claude page itself. The pop-up decides the rest (snooze, already connected) on its own.
+  const claudeEvents = (meta.claude_events_popup ?? {}) as ClaudeEventsPopupState
+  const showsClaudeEvents =
+    roleInList(session.profile.role, ROLES_AGENT_ASSISTANT) &&
+    !showsTeaser &&
+    !teaserJustClosed &&
+    typeof claudeEvents.done_at !== "string" &&
+    (claudeEvents.shown ?? 0) < 3 &&
+    !pathname.endsWith("/connect-claude")
+
   // Admin "view as role": honor the view-as cookie only for a real admin-staff
   // account (mirrors proxy.ts). Everyone else sees their real role.
   const cookieRole = readViewAsCookie()
@@ -169,11 +184,24 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
         <AssistantTeaserPopup
           firstName={(session.profile.fname ?? session.profile.fullname ?? "").trim().split(/\s+/)[0] ?? ""}
           chatHref={`${getDashboardRouteByRole(session.profile.role)}/fhi-chat`}
-          onDone={() =>
+          onDone={() => {
+            setTeaserJustClosed(true)
             setSession((prev) =>
               prev
                 ? { ...prev, profile: { ...prev.profile, metadata: { ...(prev.profile.metadata ?? {}), assistant_teaser_seen_at: new Date().toISOString() } } }
                 : prev,
+            )
+          }}
+        />
+      )}
+      {afterSetup && showsClaudeEvents && (
+        <ClaudeEventsPopup
+          firstName={(session.profile.fname ?? session.profile.fullname ?? "").trim().split(/\s+/)[0] ?? ""}
+          connectHref={`${getDashboardRouteByRole(session.profile.role)}/connect-claude`}
+          state={claudeEvents}
+          onDone={(next) =>
+            setSession((prev) =>
+              prev ? { ...prev, profile: { ...prev.profile, metadata: { ...(prev.profile.metadata ?? {}), claude_events_popup: next } } } : prev,
             )
           }
         />
